@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-ssr
+*.local
+.vite
+src/routeTree.gen.ts
+src/api/types.gen.ts
+.env.local
+.eslintcache

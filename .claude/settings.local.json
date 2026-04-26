@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//tmp/**)",
+      "Bash(curl -sv -X POST http://localhost:8000/bills -H 'Authorization: Bearer __TRACKED_VAR__' -F 'image=@/c/Users/arqua/AppData/Local/Temp/fake_receipt.jpg;type=image/jpeg' -o /tmp/upload_resp.json)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(PYTHONPATH=. uv run python /tmp/debug_split.py)",
+      "Bash(uv run *)"
+    ]
+  }
+}
