@@ -5,6 +5,13 @@ import type {
   BillListResponse,
   BillResponse,
   BillUpdateRequest,
+  Dimension,
+  Granularity,
+  InsightsBreakdownResponse,
+  InsightsOverviewResponse,
+  InsightsTimeseriesResponse,
+  InsightsTopItemsResponse,
+  ItemOrderBy,
   LoginRequest,
   RegisterRequest,
   TokenResponse,
@@ -49,4 +56,43 @@ export const bills = {
     }),
   deleteItem: (id: string, itemId: string) =>
     apiRequest<BillResponse>(`/bills/${id}/items/${itemId}`, { method: "DELETE" }),
+};
+
+function rangeQs(params: { from: string; to: string }) {
+  const s = new URLSearchParams();
+  s.set("from", params.from);
+  s.set("to", params.to);
+  return s;
+}
+
+export const insights = {
+  overview: (params: { from: string; to: string }) =>
+    apiRequest<InsightsOverviewResponse>(`/insights/overview?${rangeQs(params)}`),
+  timeseries: (params: { from: string; to: string; granularity: Granularity }) => {
+    const s = rangeQs(params);
+    s.set("granularity", params.granularity);
+    return apiRequest<InsightsTimeseriesResponse>(`/insights/timeseries?${s}`);
+  },
+  breakdown: (params: {
+    from: string;
+    to: string;
+    dimension: Dimension;
+    limit?: number;
+  }) => {
+    const s = rangeQs(params);
+    s.set("dimension", params.dimension);
+    if (params.limit !== undefined) s.set("limit", String(params.limit));
+    return apiRequest<InsightsBreakdownResponse>(`/insights/breakdown?${s}`);
+  },
+  topItems: (params: {
+    from: string;
+    to: string;
+    order_by?: ItemOrderBy;
+    limit?: number;
+  }) => {
+    const s = rangeQs(params);
+    if (params.order_by) s.set("order_by", params.order_by);
+    if (params.limit !== undefined) s.set("limit", String(params.limit));
+    return apiRequest<InsightsTopItemsResponse>(`/insights/items?${s}`);
+  },
 };

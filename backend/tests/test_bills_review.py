@@ -277,6 +277,99 @@ async def test_delete_item_removes_it(
     assert len(remaining) == 1
 
 
+# ---------- bill.total stays in sync with item totals ----------
+
+
+async def test_add_item_recomputes_bill_total(
+    client: AsyncClient, auth: dict[str, object], jpeg: bytes
+) -> None:
+    bill_id = await _upload(client, auth["headers"], jpeg)
+    # Sample extraction items: Milk 3.50 + Bread 8.84 = 12.34
+    await _extract(client, auth, bill_id, _sample_extraction())
+
+    r = await client.post(
+        f"/bills/{bill_id}/items",
+        headers=auth["headers"],
+        json={"name": "Apples", "total_price": 5.00},
+    )
+    assert r.status_code == 201
+    # 3.50 + 8.84 + 5.00 = 17.34
+    assert r.json()["total"] == 17.34
+
+
+async def test_update_item_recomputes_bill_total(
+    client: AsyncClient, auth: dict[str, object], jpeg: bytes
+) -> None:
+    bill_id = await _upload(client, auth["headers"], jpeg)
+    body = await _extract(client, auth, bill_id, _sample_extraction())
+    milk_id = body["items"][0]["id"]  # 3.50
+
+    r = await client.patch(
+        f"/bills/{bill_id}/items/{milk_id}",
+        headers=auth["headers"],
+        json={"total_price": 4.00},
+    )
+    assert r.status_code == 200
+    # 4.00 + 8.84 = 12.84
+    assert r.json()["total"] == 12.84
+
+
+async def test_delete_item_recomputes_bill_total(
+    client: AsyncClient, auth: dict[str, object], jpeg: bytes
+) -> None:
+    bill_id = await _upload(client, auth["headers"], jpeg)
+    body = await _extract(client, auth, bill_id, _sample_extraction())
+    bread_id = body["items"][1]["id"]  # 8.84
+
+    r = await client.delete(
+        f"/bills/{bill_id}/items/{bread_id}", headers=auth["headers"]
+    )
+    assert r.status_code == 200
+    # remaining: Milk 3.50
+    assert r.json()["total"] == 3.50
+
+
+async def test_delete_last_item_clears_bill_total(
+    client: AsyncClient, auth: dict[str, object], jpeg: bytes
+) -> None:
+    bill_id = await _upload(client, auth["headers"], jpeg)
+    body = await _extract(client, auth, bill_id, _sample_extraction())
+
+    for it in body["items"]:
+        r = await client.delete(
+            f"/bills/{bill_id}/items/{it['id']}", headers=auth["headers"]
+        )
+        assert r.status_code == 200
+
+    assert r.json()["total"] is None
+
+
+async def test_extract_does_not_force_total_to_item_sum(
+    client: AsyncClient, auth: dict[str, object], jpeg: bytes
+) -> None:
+    """Extract preserves VLM-reported total even if it disagrees with item sum
+    (receipts often have tax/fees in total but not as a line item)."""
+    from src.schemas.extraction import LineItem, RawBillExtraction
+
+    bill_id = await _upload(client, auth["headers"], jpeg)
+    body = await _extract(
+        client,
+        auth,
+        bill_id,
+        RawBillExtraction(
+            merchant="Acme",
+            total=20.00,  # VLM total
+            currency="USD",
+            items=[
+                LineItem(name="Foo", total_price=8.00),
+                LineItem(name="Bar", total_price=10.00),  # items sum to 18, total=20 (tax)
+            ],
+            raw_text="...",
+        ),
+    )
+    assert body["total"] == 20.00  # NOT 18.00 — extract preserves VLM's number
+
+
 # ---------- finalize ----------
 
 

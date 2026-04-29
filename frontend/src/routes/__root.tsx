@@ -24,6 +24,9 @@ function RootLayout() {
           <nav className="flex items-center gap-4 text-sm">
             {user ? (
               <>
+                <Link to="/dashboard" className="text-slate-700 hover:text-slate-900">
+                  Dashboard
+                </Link>
                 <Link to="/upload" className="text-slate-700 hover:text-slate-900">
                   Upload
                 </Link>

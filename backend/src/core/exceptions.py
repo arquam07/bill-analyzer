@@ -52,3 +52,7 @@ class SplitParticipantNotFound(AppError):
 
 class SplitParticipantConflict(AppError):
     """Raised when a participant name collides within a split."""
+
+
+class InvalidInsightsRange(AppError):
+    """Raised when an insights query receives an unusable date range."""

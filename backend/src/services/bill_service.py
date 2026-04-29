@@ -40,6 +40,18 @@ def _to_decimal(value: float | int | Decimal | None) -> Decimal | None:
     return Decimal(str(value))
 
 
+def _recompute_total(bill: Bill) -> None:
+    """Sync bill.total to the sum of item totals after a user edit.
+
+    Why: dashboard reads bill.total, bill detail UI shows items — they must agree.
+    Extract-time totals are preserved (VLM may report tax/fees separately); we only
+    re-sum on user-driven item add/update/delete so the contract is "edits keep
+    bill.total consistent with what the user sees."
+    """
+    totals = [it.total_price for it in bill.items if it.total_price is not None]
+    bill.total = sum(totals, Decimal(0)) if totals else None
+
+
 class BillService:
     def __init__(self, session: AsyncSession, storage: StorageBackend) -> None:
         self._session = session
@@ -165,6 +177,7 @@ class BillService:
                 category=item.category,
             )
         )
+        _recompute_total(bill)
         await self._session.commit()
         return await self._get_owned_bill(bill_id=bill.id, user=user)
 
@@ -196,6 +209,7 @@ class BillService:
         if "category" in data:
             item.category = data["category"]
 
+        _recompute_total(bill)
         await self._session.commit()
         return await self._get_owned_bill(bill_id=bill.id, user=user)
 
@@ -211,6 +225,7 @@ class BillService:
             raise BillItemNotFound(str(item_id))
 
         bill.items.remove(target)
+        _recompute_total(bill)
         await self._session.commit()
         return await self._get_owned_bill(bill_id=bill.id, user=user)
 

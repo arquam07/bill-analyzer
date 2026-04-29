@@ -9,6 +9,7 @@ describe("route modules", () => {
       import("../register"),
       import("../upload"),
       import("../bills.$billId"),
+      import("../dashboard"),
     ]);
     for (const m of modules) {
       expect(m).toHaveProperty("Route");
