@@ -62,23 +62,32 @@ export function KpiCards({ data, isLoading, isError }: Props) {
         : "text-slate-500";
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-      <Card
-        label="Total spend"
-        value={formatMoney(data.total_spend)}
-        sub={
-          <span>
-            <span className={deltaTone}>{delta.text}</span> vs prior period
-          </span>
-        }
-      />
-      <Card label="Bills" value={String(data.bill_count)} />
-      <Card label="Avg bill" value={formatMoney(data.avg_bill)} />
-      <Card
-        label="Top merchant"
-        value={data.top_merchant ?? "—"}
-        sub={data.top_category ? <span>Top category: {data.top_category}</span> : undefined}
-      />
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card
+          label="Total spend"
+          value={formatMoney(data.total_spend)}
+          sub={
+            <span>
+              <span className={deltaTone}>{delta.text}</span> vs prior period
+            </span>
+          }
+        />
+        <Card label="Bills" value={String(data.bill_count)} />
+        <Card label="Avg bill" value={formatMoney(data.avg_bill)} />
+        <Card
+          label="Top merchant"
+          value={data.top_merchant ?? "—"}
+          sub={data.top_category ? <span>Top category: {data.top_category}</span> : undefined}
+        />
+      </div>
+      {data.bills_missing_date > 0 && (
+        <div className="rounded border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+          {data.bills_missing_date} reviewed{" "}
+          {data.bills_missing_date === 1 ? "bill is" : "bills are"} missing a date and excluded
+          from insights. Open the bill and set the date to include it.
+        </div>
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ class InsightsOverviewResponse(BaseModel):
     top_merchant: str | None = None
     prev_total_spend: float
     spend_delta_pct: float | None = None
+    bills_missing_date: int = 0
 
 
 class TimeseriesPoint(BaseModel):
@@ -59,3 +60,19 @@ class InsightsTopItemsResponse(BaseModel):
     range_to: date
     order_by: ItemOrderBy
     rows: list[TopItem]
+
+
+class ItemTimeseriesPoint(BaseModel):
+    period: date
+    total: float
+    count: int
+
+
+class ItemTimeseriesResponse(BaseModel):
+    normalized_name: str
+    range_from: date
+    range_to: date
+    granularity: Granularity
+    total_spend: float
+    purchase_count: int
+    points: list[ItemTimeseriesPoint]

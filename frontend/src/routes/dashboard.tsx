@@ -1,5 +1,5 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "~/auth/AuthContext";
 import {
   useBreakdown,
@@ -8,7 +8,9 @@ import {
   useTopItems,
 } from "~/features/insights/api";
 import { BillsList } from "~/features/insights/BillsList";
+import { SplitsTab } from "~/features/splits/SplitsTab";
 import { BreakdownChart } from "~/features/insights/BreakdownChart";
+import { ItemDetailDrawer } from "~/features/insights/ItemDetailDrawer";
 import { KpiCards } from "~/features/insights/KpiCards";
 import { SpendOverTimeChart } from "~/features/insights/SpendOverTimeChart";
 import { TimeRangePicker } from "~/features/insights/TimeRangePicker";
@@ -22,8 +24,8 @@ import {
 } from "~/features/insights/range";
 import type { ItemOrderBy } from "~/api/types";
 
-type Tab = "insights" | "history";
-const TABS: readonly Tab[] = ["insights", "history"];
+type Tab = "insights" | "history" | "splits";
+const TABS: readonly Tab[] = ["insights", "history", "splits"];
 
 interface DashboardSearch {
   preset?: Preset;
@@ -37,7 +39,9 @@ function isPreset(v: unknown): v is Preset {
   return typeof v === "string" && (PRESETS as readonly string[]).includes(v);
 }
 function isTab(v: unknown): v is Tab {
-  return typeof v === "string" && (TABS as readonly string[]).includes(v);
+  return (
+    typeof v === "string" && (TABS as readonly string[]).includes(v)
+  );
 }
 function isOrderBy(v: unknown): v is ItemOrderBy {
   return v === "spend" || v === "frequency";
@@ -47,6 +51,10 @@ function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const search = Route.useSearch();
+  const [selectedItem, setSelectedItem] = useState<{
+    normalized_name: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) void navigate({ to: "/login" });
@@ -63,6 +71,7 @@ function DashboardPage() {
   const granularity = useMemo(() => pickGranularity(range), [range]);
 
   const enabled = Boolean(user) && tab === "insights";
+  const splitsEnabled = Boolean(user) && tab === "splits";
   const overview = useOverview(range.from, range.to, enabled);
   const timeseries = useTimeseries(range.from, range.to, granularity, enabled);
   const categoryBreakdown = useBreakdown(range.from, range.to, "category", enabled);
@@ -106,7 +115,9 @@ function DashboardPage() {
         </nav>
       </div>
 
-      {tab === "insights" ? (
+      {tab === "splits" ? (
+        <SplitsTab enabled={splitsEnabled} />
+      ) : tab === "insights" ? (
         <>
           <TimeRangePicker
             preset={preset}
@@ -153,11 +164,21 @@ function DashboardPage() {
             isError={topItems.isError}
             orderBy={orderBy}
             onOrderByChange={(next) => setSearch({ order_by: next })}
+            onSelect={setSelectedItem}
+          />
+          <ItemDetailDrawer
+            normalizedName={selectedItem?.normalized_name ?? null}
+            displayName={selectedItem?.name ?? ""}
+            from={range.from}
+            to={range.to}
+            granularity={granularity}
+            onClose={() => setSelectedItem(null)}
           />
         </>
       ) : (
         <BillsList />
       )}
+
     </div>
   );
 }

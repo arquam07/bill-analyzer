@@ -7,6 +7,7 @@ interface Props {
   isError: boolean;
   orderBy: ItemOrderBy;
   onOrderByChange: (next: ItemOrderBy) => void;
+  onSelect?: (row: { normalized_name: string; name: string }) => void;
 }
 
 function titleCase(s: string): string {
@@ -19,6 +20,7 @@ export function TopItemsTable({
   isError,
   orderBy,
   onOrderByChange,
+  onSelect,
 }: Props) {
   return (
     <div className="bg-white border border-slate-200 rounded">
@@ -61,7 +63,18 @@ export function TopItemsTable({
             </thead>
             <tbody>
               {data.rows.map((row) => (
-                <tr key={row.normalized_name} className="border-t border-slate-100">
+                <tr
+                  key={row.normalized_name}
+                  className={
+                    "border-t border-slate-100" +
+                    (onSelect ? " cursor-pointer hover:bg-slate-50" : "")
+                  }
+                  onClick={
+                    onSelect
+                      ? () => onSelect({ normalized_name: row.normalized_name, name: row.name })
+                      : undefined
+                  }
+                >
                   <td className="py-2 truncate max-w-[180px]">
                     {titleCase(row.normalized_name) || row.name}
                   </td>

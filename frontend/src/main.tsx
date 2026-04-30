@@ -8,7 +8,12 @@ import "./styles.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: false, refetchOnWindowFocus: false },
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+      staleTime: 0,   // data is always considered stale
+      gcTime: 0,      // discard cache immediately when a query has no observers
+    },
   },
 });
 

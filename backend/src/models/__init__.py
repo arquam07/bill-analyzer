@@ -1,6 +1,7 @@
 from src.models.bill import Bill, BillItem
 from src.models.session import UserSession
 from src.models.split import Split, SplitItemShare, SplitParticipant
+from src.models.split_request import SplitRequest, SplitSettlement
 from src.models.user import User
 
 __all__ = [
@@ -9,6 +10,8 @@ __all__ = [
     "Split",
     "SplitItemShare",
     "SplitParticipant",
+    "SplitRequest",
+    "SplitSettlement",
     "User",
     "UserSession",
 ]

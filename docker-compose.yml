@@ -18,14 +18,12 @@ services:
   backend:
     build:
       context: ./backend
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql+asyncpg://bill:bill@postgres:5432/bill_analyzer
       LOG_LEVEL: INFO
       APP_ENV: dev
-      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-glm-ocr}
-      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
-      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

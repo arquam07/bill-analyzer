@@ -1,5 +1,6 @@
 import { apiRequest, apiVoid } from "./fetcher";
 import type {
+  BalancesResponse,
   BillItemCreateRequest,
   BillItemUpdateRequest,
   BillListResponse,
@@ -12,9 +13,14 @@ import type {
   InsightsTimeseriesResponse,
   InsightsTopItemsResponse,
   ItemOrderBy,
+  ItemTimeseriesResponse,
   LoginRequest,
   RegisterRequest,
+  SettlementResponse,
+  SplitRequestListResponse,
+  SplitRequestResponse,
   TokenResponse,
+  UserPublicResponse,
   UserResponse,
 } from "./types";
 
@@ -58,6 +64,25 @@ export const bills = {
     apiRequest<BillResponse>(`/bills/${id}/items/${itemId}`, { method: "DELETE" }),
 };
 
+export const splitRequests = {
+  getUserByUsername: (username: string) =>
+    apiRequest<UserPublicResponse>(`/users/by-username/${encodeURIComponent(username)}`),
+  create: (billId: string, usernames: string[], totalToSplit?: number) =>
+    apiRequest<SplitRequestListResponse>(`/bills/${billId}/split-requests`, {
+      method: "POST",
+      body: { usernames, total_to_split: totalToSplit },
+    }),
+  listIncoming: () => apiRequest<SplitRequestListResponse>("/split-requests/incoming"),
+  listOutgoing: () => apiRequest<SplitRequestListResponse>("/split-requests/outgoing"),
+  accept: (id: string) =>
+    apiRequest<SplitRequestResponse>(`/split-requests/${id}/accept`, { method: "POST" }),
+  reject: (id: string) =>
+    apiRequest<SplitRequestResponse>(`/split-requests/${id}/reject`, { method: "POST" }),
+  balances: () => apiRequest<BalancesResponse>("/balances"),
+  settle: (body: { username: string; amount: number; note?: string }) =>
+    apiRequest<SettlementResponse>("/settlements", { method: "POST", body }),
+};
+
 function rangeQs(params: { from: string; to: string }) {
   const s = new URLSearchParams();
   s.set("from", params.from);
@@ -94,5 +119,17 @@ export const insights = {
     if (params.order_by) s.set("order_by", params.order_by);
     if (params.limit !== undefined) s.set("limit", String(params.limit));
     return apiRequest<InsightsTopItemsResponse>(`/insights/items?${s}`);
+  },
+  itemTimeseries: (params: {
+    normalized_name: string;
+    from: string;
+    to: string;
+    granularity: Granularity;
+  }) => {
+    const s = rangeQs(params);
+    s.set("granularity", params.granularity);
+    return apiRequest<ItemTimeseriesResponse>(
+      `/insights/items/${encodeURIComponent(params.normalized_name)}/timeseries?${s}`,
+    );
   },
 };

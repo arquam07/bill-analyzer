@@ -147,7 +147,7 @@ async def test_list_bills_only_returns_own(
 
     other = await client.post(
         "/auth/register",
-        json={"email": "other@example.com", "password": "passw0rd!"},
+        json={"email": "other@example.com", "password": "passw0rd!", "username": "otheruser"},
     )
     other_headers = {"Authorization": f"Bearer {other.json()['token']}"}
     r = await client.get("/bills", headers=other_headers)
@@ -165,7 +165,7 @@ async def test_get_other_users_bill_returns_404(
     bill_id = await _upload(client, auth["headers"], jpeg)
     other = await client.post(
         "/auth/register",
-        json={"email": "stranger@example.com", "password": "passw0rd!"},
+        json={"email": "stranger@example.com", "password": "passw0rd!", "username": "stranger"},
     )
     other_headers = {"Authorization": f"Bearer {other.json()['token']}"}
     r = await client.get(f"/bills/{bill_id}", headers=other_headers)
@@ -481,7 +481,7 @@ async def test_other_user_cannot_edit_item(
 
     other = await client.post(
         "/auth/register",
-        json={"email": "intruder@example.com", "password": "passw0rd!"},
+        json={"email": "intruder@example.com", "password": "passw0rd!", "username": "intruder"},
     )
     other_headers = {"Authorization": f"Bearer {other.json()['token']}"}
 

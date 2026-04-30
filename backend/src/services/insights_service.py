@@ -13,6 +13,8 @@ from src.schemas.insights import (
     InsightsTimeseriesResponse,
     InsightsTopItemsResponse,
     ItemOrderBy,
+    ItemTimeseriesPoint,
+    ItemTimeseriesResponse,
     TimeseriesPoint,
     TopItem,
 )
@@ -56,6 +58,7 @@ class InsightsService:
         total, count = await self._repo.total_and_count(user_id=user.id, range_from=rf, range_to=rt)
         top_merchant = await self._repo.top_merchant(user_id=user.id, range_from=rf, range_to=rt)
         top_category = await self._repo.top_category(user_id=user.id, range_from=rf, range_to=rt)
+        missing_date = await self._repo.bills_missing_date(user_id=user.id)
 
         duration = rt - rf
         prev_to = rf - timedelta(days=1)
@@ -82,6 +85,7 @@ class InsightsService:
             top_merchant=top_merchant,
             prev_total_spend=prev_total,
             spend_delta_pct=delta_pct,
+            bills_missing_date=missing_date,
         )
 
     async def timeseries(
@@ -167,4 +171,33 @@ class InsightsService:
                 )
                 for display, normalized, total, count, last in rows
             ],
+        )
+
+    async def item_timeseries(
+        self,
+        *,
+        user: User,
+        normalized_name: str,
+        range_from: date | None,
+        range_to: date | None,
+        granularity: Granularity,
+    ) -> ItemTimeseriesResponse:
+        rf, rt = _resolve_range(range_from, range_to)
+        _validate_range(rf, rt)
+
+        total_spend, purchase_count, points = await self._repo.item_timeseries(
+            user_id=user.id,
+            normalized_name=normalized_name,
+            range_from=rf,
+            range_to=rt,
+            granularity=granularity,
+        )
+        return ItemTimeseriesResponse(
+            normalized_name=normalized_name,
+            range_from=rf,
+            range_to=rt,
+            granularity=granularity,
+            total_spend=total_spend,
+            purchase_count=purchase_count,
+            points=[ItemTimeseriesPoint(period=d, total=t, count=c) for d, t, c in points],
         )

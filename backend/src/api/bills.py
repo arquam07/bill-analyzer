@@ -130,7 +130,7 @@ async def extract_bill(
         ) from exc
     except OllamaUnavailable as exc:
         raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE, "vision service unavailable"
+            status.HTTP_503_SERVICE_UNAVAILABLE, f"vision service unavailable: {exc}"
         ) from exc
     except (OllamaResponseError, VLMResponseInvalid) as exc:
         raise HTTPException(

@@ -30,7 +30,7 @@ function RootLayout() {
                 <Link to="/upload" className="text-slate-700 hover:text-slate-900">
                   Upload
                 </Link>
-                <span className="text-slate-500">{user.email}</span>
+                <span className="text-slate-500">@{user.username}</span>
                 <button
                   onClick={() => {
                     void logout().then(() => navigate({ to: "/login" }));

@@ -95,7 +95,7 @@ async def test_extract_other_users_bill_returns_404(
     # Second user authenticates
     other = await client.post(
         "/auth/register",
-        json={"email": "stranger@example.com", "password": "passw0rd!"},
+        json={"email": "stranger@example.com", "password": "passw0rd!", "username": "stranger"},
     )
     other_headers = {"Authorization": f"Bearer {other.json()['token']}"}
 

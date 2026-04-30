@@ -4,6 +4,7 @@ from src.core.exceptions import (
     EmailAlreadyExists,
     InvalidCredentials,
     InvalidSessionToken,
+    UsernameAlreadyExists,
 )
 from src.core.security import (
     generate_session_token,
@@ -23,13 +24,15 @@ class AuthService:
         self._sessions = SessionRepository(session)
 
     async def register(
-        self, *, email: str, password: str, name: str | None
+        self, *, email: str, username: str, password: str, name: str | None
     ) -> tuple[User, str]:
         normalized = email.lower()
         if await self._users.get_by_email(normalized) is not None:
             raise EmailAlreadyExists(normalized)
+        if await self._users.get_by_username(username) is not None:
+            raise UsernameAlreadyExists(username)
         user = await self._users.create(
-            email=normalized, password_hash=hash_password(password), name=name
+            email=normalized, username=username, password_hash=hash_password(password), name=name
         )
         token = await self._issue_token(user)
         await self._session.commit()

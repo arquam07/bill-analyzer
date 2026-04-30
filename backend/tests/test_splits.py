@@ -107,7 +107,7 @@ async def test_get_split_other_users_bill_returns_404(
     bill_id, _ = await _setup_extracted_bill(client, auth, jpeg)
     other = await client.post(
         "/auth/register",
-        json={"email": "stranger@example.com", "password": "passw0rd!"},
+        json={"email": "stranger@example.com", "password": "passw0rd!", "username": "stranger"},
     )
     other_headers = {"Authorization": f"Bearer {other.json()['token']}"}
     r = await client.get(f"/bills/{bill_id}/split", headers=other_headers)
@@ -139,7 +139,7 @@ async def test_add_participant_links_user_by_email(
     # Register a friend so the email lookup hits
     friend = await client.post(
         "/auth/register",
-        json={"email": "bob@example.com", "password": "passw0rd!"},
+        json={"email": "bob@example.com", "password": "passw0rd!", "username": "bob"},
     )
     friend_id = friend.json()["user"]["id"]
 

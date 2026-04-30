@@ -11,6 +11,7 @@ from src.api.bills import router as bills_router
 from src.api.health import router as health_router
 from src.api.insights import router as insights_router
 from src.api.me import router as me_router
+from src.api.split_requests import router as split_requests_router
 from src.api.splits import router as splits_router
 from src.core.config import get_settings
 from src.core.logging import configure_logging
@@ -55,4 +56,5 @@ app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(bills_router)
 app.include_router(splits_router)
+app.include_router(split_requests_router)
 app.include_router(insights_router)

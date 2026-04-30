@@ -31,6 +31,7 @@ export interface InsightsOverviewResponse {
   top_merchant: string | null;
   prev_total_spend: number;
   spend_delta_pct: number | null;
+  bills_missing_date: number;
 }
 
 export interface TimeseriesPoint {
@@ -75,4 +76,70 @@ export interface InsightsTopItemsResponse {
   range_to: string;
   order_by: ItemOrderBy;
   rows: TopItem[];
+}
+
+export interface ItemTimeseriesPoint {
+  period: string;
+  total: number;
+  count: number;
+}
+
+export interface ItemTimeseriesResponse {
+  normalized_name: string;
+  range_from: string;
+  range_to: string;
+  granularity: Granularity;
+  total_spend: number;
+  purchase_count: number;
+  points: ItemTimeseriesPoint[];
+}
+
+// --- Split requests ---
+
+export interface UserPublicResponse {
+  id: string;
+  username: string;
+  name: string | null;
+}
+
+export interface SplitRequestBillSummary {
+  merchant: string | null;
+  total: number | null;
+  billed_at: string | null;
+}
+
+export interface SplitRequestResponse {
+  id: string;
+  bill_id: string;
+  from_username: string;
+  to_username: string;
+  amount: number;
+  status: "pending" | "accepted" | "rejected";
+  note: string | null;
+  created_at: string;
+  responded_at: string | null;
+  bill: SplitRequestBillSummary;
+}
+
+export interface SplitRequestListResponse {
+  items: SplitRequestResponse[];
+}
+
+export interface BalanceRow {
+  username: string;
+  user_id: string;
+  net: number;
+}
+
+export interface BalancesResponse {
+  balances: BalanceRow[];
+}
+
+export interface SettlementResponse {
+  id: string;
+  from_username: string;
+  to_username: string;
+  amount: number;
+  note: string | null;
+  created_at: string;
 }

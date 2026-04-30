@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { bills as billsApi } from "~/api/endpoints";
 import { ApiError } from "~/api/fetcher";
 import { useAuth } from "~/auth/AuthContext";
+import { SplitModal } from "~/features/splits/SplitModal";
 import type {
   BillItemCreateRequest,
   BillItemResponse,
@@ -11,6 +12,86 @@ import type {
   BillResponse,
   BillUpdateRequest,
 } from "~/api/types";
+
+const EXTRACTION_MESSAGES = [
+  "Reading receipt…",
+  "Detecting line items…",
+  "Identifying merchant…",
+  "Parsing totals…",
+  "Almost there…",
+];
+
+function ExtractionButton({
+  isPending,
+  label,
+  reextract,
+  onClick,
+  className,
+}: {
+  isPending: boolean;
+  label: string;
+  reextract?: boolean;
+  onClick: () => void;
+  className: string;
+}) {
+  const [msgIdx, setMsgIdx] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (isPending) {
+      setMsgIdx(0);
+      intervalRef.current = setInterval(
+        () => setMsgIdx((i) => (i + 1) % EXTRACTION_MESSAGES.length),
+        10_000,
+      );
+    } else {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setMsgIdx(0);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isPending]);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={isPending}
+      className={className}
+    >
+      {isPending ? (
+        <span className="flex items-center gap-2">
+          <svg
+            className="animate-spin h-4 w-4 shrink-0"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
+          </svg>
+          {EXTRACTION_MESSAGES[msgIdx]}
+        </span>
+      ) : reextract ? (
+        "Re-extract"
+      ) : (
+        label
+      )}
+    </button>
+  );
+}
 
 function asNumber(s: string): number | null {
   if (s.trim() === "") return null;
@@ -266,6 +347,8 @@ function BillDetail() {
     if (!authLoading && !user) void navigate({ to: "/login" });
   }, [authLoading, user, navigate]);
 
+  const [showSplit, setShowSplit] = useState(false);
+
   const billQuery = useQuery({
     queryKey: ["bills", billId],
     queryFn: () => billsApi.get(billId),
@@ -277,17 +360,22 @@ function BillDetail() {
     void qc.invalidateQueries({ queryKey: ["bills"] });
   }
 
+  function setBillAndRefreshInsights(updated: BillResponse) {
+    setBill(updated);
+    void qc.invalidateQueries({ queryKey: ["insights"] });
+  }
+
   const patchBill = useMutation({
     mutationFn: (body: BillUpdateRequest) => billsApi.patch(billId, body),
     onSuccess: setBill,
   });
   const extract = useMutation({
     mutationFn: () => billsApi.extract(billId),
-    onSuccess: setBill,
+    onSuccess: setBillAndRefreshInsights,
   });
   const finalize = useMutation({
     mutationFn: () => billsApi.finalize(billId),
-    onSuccess: setBill,
+    onSuccess: setBillAndRefreshInsights,
   });
   const addItem = useMutation({
     mutationFn: (body: BillItemCreateRequest) => billsApi.addItem(billId, body),
@@ -341,26 +429,32 @@ function BillDetail() {
           </p>
         </div>
         <div className="flex gap-2">
-          {bill.status === "uploaded" && (
+          {bill.total !== null && bill.total !== undefined && (
             <button
               type="button"
-              onClick={() => extract.mutate()}
-              disabled={extract.isPending}
-              className="bg-slate-900 text-white text-sm rounded px-3 py-2 disabled:opacity-60"
+              onClick={() => setShowSplit(true)}
+              className="bg-violet-700 text-white text-sm rounded px-3 py-2 hover:bg-violet-800"
             >
-              {extract.isPending ? "Extracting…" : "Run extraction"}
+              Split bill
             </button>
+          )}
+          {bill.status === "uploaded" && (
+            <ExtractionButton
+              isPending={extract.isPending}
+              label="Run extraction"
+              onClick={() => extract.mutate()}
+              className="bg-slate-900 text-white text-sm rounded px-3 py-2 disabled:opacity-60"
+            />
           )}
           {bill.status === "extracted" && (
             <>
-              <button
-                type="button"
+              <ExtractionButton
+                isPending={extract.isPending}
+                label="Re-extract"
+                reextract
                 onClick={() => extract.mutate()}
-                disabled={extract.isPending}
                 className="bg-white border border-slate-300 text-sm rounded px-3 py-2 disabled:opacity-60"
-              >
-                {extract.isPending ? "Re-extracting…" : "Re-extract"}
-              </button>
+              />
               <button
                 type="button"
                 onClick={() => finalize.mutate()}
@@ -453,6 +547,19 @@ function BillDetail() {
 
       {/* Image URL placeholder — backend doesn't yet serve images, ignore */}
       <p className="text-xs text-slate-400 truncate">image: {imageUrl}</p>
+
+      {showSplit && bill.total !== null && bill.total !== undefined && (
+        <SplitModal
+          billId={bill.id}
+          total={bill.total}
+          merchant={bill.merchant ?? null}
+          items={items}
+          onClose={() => setShowSplit(false)}
+          onSuccess={() => {
+            void qc.invalidateQueries({ queryKey: ["split-requests"] });
+          }}
+        />
+      )}
     </div>
   );
 }

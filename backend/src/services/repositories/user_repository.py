@@ -17,8 +17,14 @@ class UserRepository:
     async def get_by_id(self, user_id: uuid.UUID) -> User | None:
         return await self._session.get(User, user_id)
 
-    async def create(self, *, email: str, password_hash: str, name: str | None) -> User:
-        user = User(email=email, password_hash=password_hash, name=name)
+    async def get_by_username(self, username: str) -> User | None:
+        result = await self._session.execute(select(User).where(User.username == username))
+        return result.scalar_one_or_none()
+
+    async def create(
+        self, *, email: str, username: str, password_hash: str, name: str | None
+    ) -> User:
+        user = User(email=email, username=username, password_hash=password_hash, name=name)
         self._session.add(user)
         await self._session.flush()
         return user

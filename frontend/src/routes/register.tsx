@@ -1,27 +1,35 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "~/auth/AuthContext";
 import { ApiError } from "~/api/fetcher";
 
 function RegisterPage() {
-  const { register } = useAuth();
+  const { user, isLoading, register } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!isLoading && user) void navigate({ to: "/dashboard" });
+  }, [user, isLoading, navigate]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!/^[a-z0-9]{3,50}$/.test(username)) {
+      setError("Username must be 3–50 lowercase letters and numbers only");
+      return;
+    }
     setSubmitting(true);
     try {
-      await register(email, password, name || undefined);
-      void navigate({ to: "/" });
+      await register(email, password, username, name || undefined);
+      // navigation is handled by the useEffect above once user state updates
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Registration failed");
-    } finally {
       setSubmitting(false);
     }
   }
@@ -37,6 +45,20 @@ function RegisterPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full border border-slate-300 rounded px-3 py-2"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="text-slate-700">Username</span>
+          <input
+            type="text"
+            required
+            minLength={3}
+            maxLength={50}
+            pattern="[a-z0-9]+"
+            placeholder="lowercase letters and numbers"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""))}
             className="mt-1 w-full border border-slate-300 rounded px-3 py-2"
           />
         </label>

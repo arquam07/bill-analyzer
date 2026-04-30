@@ -6,6 +6,10 @@ class EmailAlreadyExists(AppError):
     pass
 
 
+class UsernameAlreadyExists(AppError):
+    pass
+
+
 class InvalidCredentials(AppError):
     pass
 
@@ -56,3 +60,31 @@ class SplitParticipantConflict(AppError):
 
 class InvalidInsightsRange(AppError):
     """Raised when an insights query receives an unusable date range."""
+
+
+class UserNotFound(AppError):
+    pass
+
+
+class BillHasNoTotal(AppError):
+    """Bill total is null — cannot compute split amounts."""
+
+
+class SplitRequestNotFound(AppError):
+    pass
+
+
+class SplitRequestNotPending(AppError):
+    """Accept/reject attempted on a non-pending request."""
+
+
+class SplitRequestNotRecipient(AppError):
+    """User tried to accept/reject a request they didn't receive."""
+
+
+class SplitRequestAlreadyExists(AppError):
+    """A pending request for this bill+pair already exists."""
+
+
+class SplitWithSelf(AppError):
+    """User tried to split a bill with themselves."""

@@ -14,6 +14,7 @@ from src.schemas.insights import (
     InsightsTimeseriesResponse,
     InsightsTopItemsResponse,
     ItemOrderBy,
+    ItemTimeseriesResponse,
 )
 from src.services.insights_service import InsightsService
 
@@ -88,6 +89,27 @@ async def timeseries(
     try:
         return await InsightsService(db).timeseries(
             user=user,
+            range_from=range_from,
+            range_to=range_to,
+            granularity=granularity,
+        )
+    except InvalidInsightsRange as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+
+
+@router.get("/items/{normalized_name}/timeseries", response_model=ItemTimeseriesResponse)
+async def item_timeseries(
+    normalized_name: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    range_from: date | None = Query(default=None, alias="from"),
+    range_to: date | None = Query(default=None, alias="to"),
+    granularity: Granularity = Query(default="month"),
+) -> ItemTimeseriesResponse:
+    try:
+        return await InsightsService(db).item_timeseries(
+            user=user,
+            normalized_name=normalized_name,
             range_from=range_from,
             range_to=range_to,
             granularity=granularity,

@@ -2,6 +2,25 @@ import { useQuery } from "@tanstack/react-query";
 import { insights as insightsApi } from "~/api/endpoints";
 import type { Dimension, Granularity, ItemOrderBy } from "~/api/types";
 
+export function useItemTimeseries(
+  normalizedName: string | null,
+  from: string,
+  to: string,
+  granularity: Granularity,
+) {
+  return useQuery({
+    queryKey: ["insights", "item-timeseries", normalizedName, from, to, granularity],
+    queryFn: () =>
+      insightsApi.itemTimeseries({
+        normalized_name: normalizedName!,
+        from,
+        to,
+        granularity,
+      }),
+    enabled: normalizedName !== null,
+  });
+}
+
 export function useOverview(from: string, to: string, enabled = true) {
   return useQuery({
     queryKey: ["insights", "overview", from, to],

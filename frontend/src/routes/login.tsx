@@ -1,15 +1,19 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "~/auth/AuthContext";
 import { ApiError } from "~/api/fetcher";
 
 function LoginPage() {
-  const { login } = useAuth();
+  const { user, isLoading, login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && user) void navigate({ to: "/dashboard" });
+  }, [user, isLoading, navigate]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -17,10 +21,9 @@ function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      void navigate({ to: "/" });
+      // navigation is handled by the useEffect above once user state updates
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Login failed");
-    } finally {
       setSubmitting(false);
     }
   }

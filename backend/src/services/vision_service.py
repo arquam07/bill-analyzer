@@ -59,6 +59,8 @@ class VisionService:
 
     async def extract_bill(self, image_bytes: bytes) -> RawBillExtraction:
         b64 = base64.b64encode(image_bytes).decode("ascii")
+        print(f"ollama model: {self._model}")
+        print(f"ollama timeout: {self._timeout}")
         payload = {
             "model": self._model,
             "messages": [
@@ -77,8 +79,10 @@ class VisionService:
                 headers=headers,
                 timeout=self._timeout,
             )
-        except (httpx.ConnectError, httpx.TimeoutException) as exc:
-            raise OllamaUnavailable(str(exc)) from exc
+        except httpx.TimeoutException as exc:
+            raise OllamaUnavailable(f"request timed out after {self._timeout}s: {exc}") from exc
+        except httpx.ConnectError as exc:
+            raise OllamaUnavailable(f"cannot connect to {self._host}: {exc}") from exc
 
         if response.status_code != 200:
             raise OllamaResponseError(

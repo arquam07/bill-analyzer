@@ -29,7 +29,10 @@ function UploadPage() {
   const upload = useMutation({
     mutationFn: (f: File) => billsApi.upload(f),
     onSuccess: async (bill) => {
-      await qc.invalidateQueries({ queryKey: ["bills"] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["bills"] }),
+        qc.invalidateQueries({ queryKey: ["insights"] }),
+      ]);
       void navigate({ to: "/bills/$billId", params: { billId: bill.id } });
     },
   });

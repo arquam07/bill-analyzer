@@ -9,7 +9,7 @@ interface AuthState {
   user: UserResponse | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name?: string) => Promise<void>;
+  register: (email: string, password: string, username: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -61,8 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (email: string, password: string, name?: string) => {
-      const res = await authApi.register({ email, password, name: name ?? null });
+    async (email: string, password: string, username: string, name?: string) => {
+      const res = await authApi.register({ email, password, username, name: name ?? null });
       setToken(res.token);
       setUser(res.user);
       await queryClient.invalidateQueries();

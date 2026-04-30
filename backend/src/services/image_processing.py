@@ -9,9 +9,13 @@ SUPPORTED_FORMATS: dict[str, str] = {
     "PNG": "image/png",
 }
 
+# Receipt OCR doesn't benefit from resolution above this; keeping images small
+# dramatically reduces VLM inference time and payload size.
+MAX_SIDE_PX = 1536
+
 
 def process_image(data: bytes) -> tuple[bytes, str, str]:
-    """Validate, sniff format, strip EXIF/metadata by re-encoding.
+    """Validate, sniff format, strip EXIF/metadata, and downscale large images.
 
     Returns (re-encoded bytes, mime_type, pillow format name).
     Raises UnsupportedImageFormat if the bytes aren't a JPEG or PNG.
@@ -26,11 +30,15 @@ def process_image(data: bytes) -> tuple[bytes, str, str]:
     if fmt not in SUPPORTED_FORMATS:
         raise UnsupportedImageFormat(fmt)
 
+    # Downscale if either dimension exceeds the cap (preserves aspect ratio).
+    if max(img.size) > MAX_SIDE_PX:
+        img.thumbnail((MAX_SIDE_PX, MAX_SIDE_PX), Image.LANCZOS)
+
     buf = BytesIO()
     if fmt == "JPEG":
         if img.mode != "RGB":
             img = img.convert("RGB")
-        img.save(buf, format="JPEG", quality=95, optimize=True)
+        img.save(buf, format="JPEG", quality=85, optimize=True)
     else:
         img.save(buf, format="PNG", optimize=True)
 

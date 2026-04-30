@@ -63,7 +63,7 @@ async def client(postgres_url: str, storage_root: Path) -> AsyncIterator[AsyncCl
 async def auth(client: AsyncClient) -> dict[str, object]:
     r = await client.post(
         "/auth/register",
-        json={"email": "user@example.com", "password": "passw0rd!", "name": "User"},
+        json={"email": "user@example.com", "password": "passw0rd!", "username": "testuser", "name": "User"},
     )
     body = r.json()
     return {

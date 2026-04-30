@@ -156,7 +156,7 @@ async def test_overview_excludes_other_users_bills(
 
     other = await client.post(
         "/auth/register",
-        json={"email": "other@example.com", "password": "passw0rd!", "name": "O"},
+        json={"email": "other@example.com", "password": "passw0rd!", "username": "otheruser", "name": "O"},
     )
     other_uid = other.json()["user"]["id"]
     await _seed_bill(user_id=other_uid, billed_at=today, total=999.0)
@@ -598,7 +598,7 @@ async def test_items_excludes_other_users(
 
     other = await client.post(
         "/auth/register",
-        json={"email": "x@y.com", "password": "passw0rd!", "name": "X"},
+        json={"email": "x@y.com", "password": "passw0rd!", "username": "xuser", "name": "X"},
     )
     other_uid = other.json()["user"]["id"]
     await _seed_bill(
@@ -636,5 +636,137 @@ async def test_items_inverted_range_returns_422(
 ) -> None:
     r = await client.get(
         "/insights/items?from=2026-05-01&to=2026-04-01", headers=auth["headers"]
+    )
+    assert r.status_code == 422
+
+
+# ---------- bills_missing_date ----------
+
+
+async def test_overview_bills_missing_date_counts_reviewed_without_billed_at(
+    client: AsyncClient, auth: dict[str, object]
+) -> None:
+    uid = str(auth["user_id"])
+    today = _today()
+    await _seed_bill(user_id=uid, billed_at=today, total=10.0)  # has date — not counted
+    await _seed_bill(user_id=uid, billed_at=None, total=5.0, status="reviewed")  # counted
+    await _seed_bill(user_id=uid, billed_at=None, total=5.0, status="extracted")  # not reviewed — ignored
+
+    body = (await client.get("/insights/overview", headers=auth["headers"])).json()
+    assert body["bills_missing_date"] == 1
+
+
+async def test_overview_bills_missing_date_zero_when_all_have_date(
+    client: AsyncClient, auth: dict[str, object]
+) -> None:
+    uid = str(auth["user_id"])
+    today = _today()
+    await _seed_bill(user_id=uid, billed_at=today, total=10.0)
+
+    body = (await client.get("/insights/overview", headers=auth["headers"])).json()
+    assert body["bills_missing_date"] == 0
+
+
+# ---------- item timeseries ----------
+
+
+async def test_item_timeseries_requires_auth(client: AsyncClient) -> None:
+    r = await client.get("/insights/items/milk/timeseries")
+    assert r.status_code == 401
+
+
+async def test_item_timeseries_returns_points_for_normalized_name(
+    client: AsyncClient, auth: dict[str, object]
+) -> None:
+    uid = str(auth["user_id"])
+    today = _today()
+    prev_month = date(today.year, today.month, 1) - timedelta(days=1)
+    prev_month_first = prev_month.replace(day=1)
+
+    await _seed_bill(
+        user_id=uid,
+        billed_at=date(today.year, today.month, 1),
+        items=[{"name": "Milk", "total_price": 3.0}],
+    )
+    await _seed_bill(
+        user_id=uid,
+        billed_at=prev_month_first,
+        items=[{"name": "MILK", "total_price": 4.0}],
+    )
+    # Bread should not appear
+    await _seed_bill(
+        user_id=uid,
+        billed_at=today,
+        items=[{"name": "Bread", "total_price": 99.0}],
+    )
+
+    rf = (prev_month_first - timedelta(days=1)).isoformat()
+    rt = today.isoformat()
+    r = await client.get(
+        f"/insights/items/milk/timeseries?from={rf}&to={rt}&granularity=month",
+        headers=auth["headers"],
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["normalized_name"] == "milk"
+    assert body["total_spend"] == pytest.approx(7.0)
+    assert body["purchase_count"] == 2
+    assert len(body["points"]) == 2
+
+
+async def test_item_timeseries_empty_when_item_not_in_range(
+    client: AsyncClient, auth: dict[str, object]
+) -> None:
+    uid = str(auth["user_id"])
+    today = _today()
+    await _seed_bill(
+        user_id=uid,
+        billed_at=today - timedelta(days=200),
+        items=[{"name": "Milk", "total_price": 5.0}],
+    )
+
+    rf = (today - timedelta(days=30)).isoformat()
+    rt = today.isoformat()
+    r = await client.get(
+        f"/insights/items/milk/timeseries?from={rf}&to={rt}&granularity=day",
+        headers=auth["headers"],
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total_spend"] == pytest.approx(0.0)
+    assert body["purchase_count"] == 0
+    assert body["points"] == []
+
+
+async def test_item_timeseries_excludes_other_users(
+    client: AsyncClient, auth: dict[str, object]
+) -> None:
+    uid = str(auth["user_id"])
+    today = _today()
+    await _seed_bill(
+        user_id=uid, billed_at=today, items=[{"name": "Milk", "total_price": 1.0}]
+    )
+
+    other = await client.post(
+        "/auth/register",
+        json={"email": "itemts@y.com", "password": "passw0rd!", "username": "itemtsuser", "name": "X"},
+    )
+    other_uid = other.json()["user"]["id"]
+    await _seed_bill(
+        user_id=other_uid, billed_at=today, items=[{"name": "Milk", "total_price": 999.0}]
+    )
+
+    body = (
+        await client.get("/insights/items/milk/timeseries", headers=auth["headers"])
+    ).json()
+    assert body["total_spend"] == pytest.approx(1.0)
+
+
+async def test_item_timeseries_inverted_range_returns_422(
+    client: AsyncClient, auth: dict[str, object]
+) -> None:
+    r = await client.get(
+        "/insights/items/milk/timeseries?from=2026-05-01&to=2026-04-01",
+        headers=auth["headers"],
     )
     assert r.status_code == 422
