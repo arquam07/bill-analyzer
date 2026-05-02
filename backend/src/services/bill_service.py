@@ -14,7 +14,12 @@ from src.core.exceptions import (
 )
 from src.models.bill import Bill, BillItem
 from src.models.user import User
-from src.schemas.bill import BillItemCreateRequest, BillItemUpdateRequest, BillUpdateRequest
+from src.schemas.bill import (
+    BillItemCreateRequest,
+    BillItemUpdateRequest,
+    BillManualCreateRequest,
+    BillUpdateRequest,
+)
 from src.schemas.extraction import RawBillExtraction
 from src.services.image_processing import process_image
 from src.services.repositories.bill_repository import BillRepository
@@ -89,6 +94,37 @@ class BillService:
             raise RuntimeError("bill disappeared after commit")
         return loaded
 
+    async def create_manual_bill(
+        self, *, user: User, fields: BillManualCreateRequest
+    ) -> Bill:
+        """Create a bill from scratch — no image, no VLM. Lands in 'extracted' state
+        so the user can review/edit/finalize through the existing UI.
+        """
+        bill_id = uuid.uuid4()
+        await self._bills.create(
+            bill_id=bill_id,
+            user_id=user.id,
+            image_path="",
+            content_hash="",
+            mime_type="",
+            byte_size=0,
+            status=STATUS_EXTRACTED,
+        )
+        bill = await self._bills.get_with_items(bill_id)
+        if bill is None:
+            raise RuntimeError("bill disappeared after create")
+        bill.merchant = fields.merchant
+        bill.total = _to_decimal(fields.total)
+        bill.currency = fields.currency
+        bill.billed_at = fields.billed_at
+        bill.category = fields.category
+        bill.extracted_at = _utcnow()
+        await self._session.commit()
+        loaded = await self._bills.get_with_items(bill_id)
+        if loaded is None:
+            raise RuntimeError("bill disappeared after commit")
+        return loaded
+
     async def _get_owned_bill(self, *, bill_id: uuid.UUID, user: User) -> Bill:
         bill = await self._bills.get_with_items(bill_id)
         if bill is None or bill.user_id != user.id:
@@ -113,12 +149,15 @@ class BillService:
             raise BillNotEditable(str(bill_id))
 
         image_bytes = await self._storage.read(bill.image_path)
-        extraction: RawBillExtraction = await vision.extract_bill(image_bytes)
+        extraction: RawBillExtraction = await vision.extract_bill(
+            image_bytes, language=user.preferred_language
+        )
 
         bill.merchant = extraction.merchant
         bill.total = _to_decimal(extraction.total)
         bill.currency = extraction.currency
         bill.billed_at = extraction.billed_at
+        bill.category = extraction.category
         bill.raw_ocr_text = extraction.raw_text
         bill.status = STATUS_EXTRACTED
         bill.extracted_at = _utcnow()
@@ -133,6 +172,7 @@ class BillService:
                     quantity=_to_decimal(item.quantity),
                     unit_price=_to_decimal(item.unit_price),
                     total_price=_to_decimal(item.total_price),
+                    category=item.category,
                 )
             )
 
@@ -155,6 +195,8 @@ class BillService:
             bill.currency = data["currency"]
         if "billed_at" in data:
             bill.billed_at = data["billed_at"]
+        if "category" in data:
+            bill.category = data["category"]
 
         await self._session.commit()
         return await self._get_owned_bill(bill_id=bill.id, user=user)

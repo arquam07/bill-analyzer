@@ -16,7 +16,7 @@ from src.services.storage.local import LocalDiskBackend
 class _NullVisionService:
     """Default stand-in: tests that exercise extraction must override the dep."""
 
-    async def extract_bill(self, image_bytes: bytes) -> object:
+    async def extract_bill(self, image_bytes: bytes, *, language: str = "en") -> object:
         raise OllamaUnavailable("vision service not configured in tests")
 
 
@@ -63,7 +63,13 @@ async def client(postgres_url: str, storage_root: Path) -> AsyncIterator[AsyncCl
 async def auth(client: AsyncClient) -> dict[str, object]:
     r = await client.post(
         "/auth/register",
-        json={"email": "user@example.com", "password": "passw0rd!", "username": "testuser", "name": "User"},
+        json={
+            "email": "user@example.com",
+            "password": "passw0rd!",
+            "username": "testuser",
+            "name": "User",
+            "preferred_language": "en",
+        },
     )
     body = r.json()
     return {

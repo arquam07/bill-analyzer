@@ -31,6 +31,7 @@ class Bill(Base):
     total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
     billed_at: Mapped[date | None] = mapped_column(nullable=True)
+    category: Mapped[str | None] = mapped_column(String(32), nullable=True)
     raw_ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     extracted_at: Mapped[datetime | None] = mapped_column(

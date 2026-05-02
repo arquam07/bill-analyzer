@@ -22,6 +22,7 @@ async def register(
             username=payload.username,
             password=payload.password,
             name=payload.name,
+            preferred_language=payload.preferred_language,
         )
     except EmailAlreadyExists as exc:
         raise HTTPException(

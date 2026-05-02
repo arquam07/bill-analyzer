@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class SplitRequestCreate(BaseModel):
     usernames: list[str] = Field(min_length=1, max_length=10)
+    bill_item_ids: list[uuid.UUID] | None = Field(default=None)
     total_to_split: float | None = Field(default=None, gt=0)
 
 

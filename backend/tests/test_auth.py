@@ -149,3 +149,49 @@ async def test_logout_one_session_does_not_affect_other(client: AsyncClient) -> 
     await client.post("/auth/logout", headers={"Authorization": f"Bearer {t1}"})
     me = await client.get("/me", headers={"Authorization": f"Bearer {t2}"})
     assert me.status_code == 200
+
+
+# ---------- preferred_language ----------
+
+
+async def test_register_defaults_to_english(client: AsyncClient) -> None:
+    r = await client.post(
+        "/auth/register",
+        json={"email": "en@example.com", "password": "passw0rd!", "username": "enuser"},
+    )
+    assert r.status_code == 201
+    assert r.json()["user"]["preferred_language"] == "en"
+
+
+async def test_register_with_japanese_persists(client: AsyncClient) -> None:
+    r = await client.post(
+        "/auth/register",
+        json={
+            "email": "ja@example.com",
+            "password": "passw0rd!",
+            "username": "jauser",
+            "preferred_language": "ja",
+        },
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["user"]["preferred_language"] == "ja"
+
+    # /me also reports it
+    me = await client.get(
+        "/me", headers={"Authorization": f"Bearer {body['token']}"}
+    )
+    assert me.json()["preferred_language"] == "ja"
+
+
+async def test_register_with_unsupported_language_returns_422(client: AsyncClient) -> None:
+    r = await client.post(
+        "/auth/register",
+        json={
+            "email": "x@example.com",
+            "password": "passw0rd!",
+            "username": "xuser",
+            "preferred_language": "fr",
+        },
+    )
+    assert r.status_code == 422

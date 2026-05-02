@@ -1,5 +1,8 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { bills as billsApi } from "~/api/endpoints";
+import { ApiError } from "~/api/fetcher";
 import { useAuth } from "~/auth/AuthContext";
 import {
   useBreakdown,
@@ -47,6 +50,72 @@ function isOrderBy(v: unknown): v is ItemOrderBy {
   return v === "spend" || v === "frequency";
 }
 
+function AddBillMenu() {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  const createManual = useMutation({
+    mutationFn: () => billsApi.createManual(),
+    onSuccess: async (bill) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["bills"] }),
+        qc.invalidateQueries({ queryKey: ["insights"] }),
+      ]);
+      setOpen(false);
+      void navigate({ to: "/bills/$billId", params: { billId: bill.id } });
+    },
+  });
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={createManual.isPending}
+        className="bg-slate-900 text-white text-sm rounded px-3 py-2 hover:bg-slate-800 disabled:opacity-60"
+      >
+        {createManual.isPending ? "Creating…" : "Add bill"}
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-52 rounded border border-slate-200 bg-white shadow-lg z-10">
+          <Link
+            to="/upload"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50"
+          >
+            Upload bill photo
+          </Link>
+          <button
+            type="button"
+            onClick={() => createManual.mutate()}
+            className="block w-full text-left px-4 py-2 text-sm text-slate-800 hover:bg-slate-50 border-t border-slate-100"
+          >
+            Add bill manually
+          </button>
+          {createManual.error && (
+            <p className="px-4 py-2 text-xs text-red-600 border-t border-slate-100">
+              {createManual.error instanceof ApiError
+                ? createManual.error.detail
+                : "Failed to create bill."}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -87,15 +156,11 @@ function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <Link
-          to="/upload"
-          className="bg-slate-900 text-white text-sm rounded px-3 py-2 hover:bg-slate-800"
-        >
-          Upload bill
-        </Link>
+        <AddBillMenu />
       </div>
 
-      <div className="border-b border-slate-200">
+      {/* Desktop tab nav — mobile uses bottom nav bar in __root */}
+      <div className="hidden sm:block border-b border-slate-200">
         <nav className="-mb-px flex gap-4 text-sm">
           {TABS.map((t) => (
             <button

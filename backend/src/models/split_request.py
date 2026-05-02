@@ -61,6 +61,42 @@ class SplitRequest(Base):
         "User", foreign_keys=[to_user_id]
     )
     bill: Mapped["Bill"] = relationship("Bill")  # type: ignore[name-defined]
+    items: Mapped[list["SplitRequestItem"]] = relationship(
+        "SplitRequestItem",
+        back_populates="split_request",
+        cascade="all, delete-orphan",
+    )
+
+
+class SplitRequestItem(Base):
+    __tablename__ = "split_request_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "split_request_id", "bill_item_id", name="uq_sri_request_item"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    split_request_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("split_requests.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    bill_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("bill_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    share_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+    split_request: Mapped["SplitRequest"] = relationship(
+        "SplitRequest", back_populates="items"
+    )
+    bill_item: Mapped["BillItem"] = relationship("BillItem")  # type: ignore[name-defined]
 
 
 class SplitSettlement(Base):

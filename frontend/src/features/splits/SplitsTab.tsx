@@ -28,7 +28,7 @@ function RequestCard({
   const isPending = req.status === "pending";
 
   return (
-    <div className="border border-slate-200 rounded p-4 space-y-2 bg-white">
+    <div className="border border-slate-200 rounded-2xl p-4 space-y-2 bg-white">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">
@@ -68,7 +68,7 @@ function RequestCard({
             type="button"
             disabled={accept.isPending}
             onClick={() => accept.mutate(req.id)}
-            className="flex-1 bg-emerald-700 text-white text-sm rounded px-3 py-1.5 disabled:opacity-50"
+            className="flex-1 bg-emerald-700 text-white text-sm rounded-lg px-3 py-2.5 disabled:opacity-50 font-medium"
           >
             {accept.isPending ? "…" : "Accept"}
           </button>
@@ -76,7 +76,7 @@ function RequestCard({
             type="button"
             disabled={reject.isPending}
             onClick={() => reject.mutate(req.id)}
-            className="flex-1 bg-white border border-slate-300 text-sm rounded px-3 py-1.5 disabled:opacity-50 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+            className="flex-1 bg-white border border-slate-300 text-sm rounded-lg px-3 py-2.5 disabled:opacity-50 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
           >
             {reject.isPending ? "…" : "Decline"}
           </button>

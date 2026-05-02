@@ -1,7 +1,9 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from src.core.constants import BILL_CATEGORIES
 
 
 class BillItemResponse(BaseModel):
@@ -32,6 +34,7 @@ class BillSummaryResponse(BaseModel):
     total: float | None = None
     currency: str | None = None
     billed_at: date | None = None
+    category: str | None = None
     extracted_at: datetime | None = None
     reviewed_at: datetime | None = None
     created_at: datetime
@@ -52,11 +55,38 @@ class BillListResponse(BaseModel):
     total: int
 
 
+def _validate_optional_category(v: str | None) -> str | None:
+    if v is None:
+        return None
+    if v not in BILL_CATEGORIES:
+        raise ValueError(f"category must be one of {BILL_CATEGORIES}")
+    return v
+
+
 class BillUpdateRequest(BaseModel):
     merchant: str | None = None
     total: float | None = None
     currency: str | None = None
     billed_at: date | None = None
+    category: str | None = None
+
+    @field_validator("category")
+    @classmethod
+    def category_supported(cls, v: str | None) -> str | None:
+        return _validate_optional_category(v)
+
+
+class BillManualCreateRequest(BaseModel):
+    merchant: str | None = Field(default=None, max_length=256)
+    total: float | None = None
+    currency: str | None = Field(default=None, max_length=8)
+    billed_at: date | None = None
+    category: str | None = None
+
+    @field_validator("category")
+    @classmethod
+    def category_supported(cls, v: str | None) -> str | None:
+        return _validate_optional_category(v)
 
 
 class BillItemCreateRequest(BaseModel):

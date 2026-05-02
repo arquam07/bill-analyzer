@@ -7,6 +7,7 @@ from src.api.deps import get_current_user, get_db
 from src.core.exceptions import (
     BillHasNoTotal,
     BillNotFound,
+    SplitItemsInvalid,
     SplitRequestAlreadyExists,
     SplitRequestNotFound,
     SplitRequestNotPending,
@@ -17,8 +18,8 @@ from src.core.exceptions import (
 from src.models.user import User
 from src.schemas.split_request import (
     BalancesResponse,
-    SettleRequest,
     SettlementResponse,
+    SettleRequest,
     SplitRequestCreate,
     SplitRequestListResponse,
     SplitRequestResponse,
@@ -62,6 +63,7 @@ async def create_split_requests(
             bill_id=bill_id,
             from_user=user,
             usernames=body.usernames,
+            bill_item_ids=body.bill_item_ids,
             total_to_split=body.total_to_split,
         )
     except BillNotFound as exc:
@@ -70,6 +72,8 @@ async def create_split_requests(
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY, "bill has no total — extract it first"
         ) from exc
+    except SplitItemsInvalid as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     except UserNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"user not found: {exc}") from exc
     except SplitWithSelf as exc:

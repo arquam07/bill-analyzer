@@ -21,6 +21,7 @@ dependencies = [
     "httpx>=0.28",
     "langchain>=0.3",
     "langgraph>=0.2",
+    "google-cloud-storage>=2.18",
 ]
 
 [dependency-groups]

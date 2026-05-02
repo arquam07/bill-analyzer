@@ -88,3 +88,7 @@ class SplitRequestAlreadyExists(AppError):
 
 class SplitWithSelf(AppError):
     """User tried to split a bill with themselves."""
+
+
+class SplitItemsInvalid(AppError):
+    """One or more bill_item_ids don't belong to the bill or have no price."""

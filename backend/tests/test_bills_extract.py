@@ -27,9 +27,13 @@ class _FakeVision:
         self._result = result
         self._raises = raises
         self.calls: list[bytes] = []
+        self.languages: list[str] = []
 
-    async def extract_bill(self, image_bytes: bytes) -> RawBillExtraction:
+    async def extract_bill(
+        self, image_bytes: bytes, *, language: str = "en"
+    ) -> RawBillExtraction:
         self.calls.append(image_bytes)
+        self.languages.append(language)
         if self._raises is not None:
             raise self._raises
         assert self._result is not None

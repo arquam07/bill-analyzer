@@ -196,3 +196,64 @@ async def test_extract_raises_when_content_fails_schema() -> None:
     service = _make_service(handler)
     with pytest.raises(VLMResponseInvalid):
         await service.extract_bill(b"x")
+
+
+async def test_extract_prompt_mentions_target_language() -> None:
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(
+            200,
+            json={"message": {"content": json.dumps({"merchant": "X", "raw_text": "x"})}},
+        )
+
+    service = _make_service(handler)
+    await service.extract_bill(b"x", language="ja")
+    body = json.loads(captured[0].content)
+    system_prompt = body["messages"][0]["content"]
+    assert "Japanese" in system_prompt
+
+
+async def test_extract_persists_bill_level_category() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "merchant": "MegaMart",
+                            "category": "grocery",
+                            "items": [{"name": "Milk", "category": "grocery"}],
+                            "raw_text": "x",
+                        }
+                    )
+                }
+            },
+        )
+
+    service = _make_service(handler)
+    result = await service.extract_bill(b"x")
+    assert result.category == "grocery"
+    assert result.items[0].category == "grocery"
+
+
+async def test_extract_drops_unknown_category() -> None:
+    """VLM emits a category outside our enum → null (don't fail extraction)."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "message": {
+                    "content": json.dumps(
+                        {"category": "luxury_yachts", "raw_text": "x"}
+                    )
+                }
+            },
+        )
+
+    service = _make_service(handler)
+    result = await service.extract_bill(b"x")
+    assert result.category is None

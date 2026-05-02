@@ -16,6 +16,8 @@ from src.api.splits import router as splits_router
 from src.core.config import get_settings
 from src.core.logging import configure_logging
 from src.db.session import make_engine, make_sessionmaker
+from src.services.storage.base import StorageBackend
+from src.services.storage.gcs import GcsBackend
 from src.services.storage.local import LocalDiskBackend
 from src.services.vision_service import VisionService
 
@@ -29,7 +31,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await conn.execute(text("SELECT 1"))
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
-    app.state.storage = LocalDiskBackend(Path(settings.storage_root))
+    storage: StorageBackend = (
+        GcsBackend(settings.gcs_bucket)
+        if settings.gcs_bucket
+        else LocalDiskBackend(Path(settings.storage_root))
+    )
+    app.state.storage = storage
     app.state.vision_service = VisionService(
         ollama_host=settings.ollama_host,
         ollama_model=settings.ollama_model,
@@ -44,9 +51,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Bill Analyzer", lifespan=lifespan)
+_settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[o.strip() for o in _settings.cors_origins.split(",") if o.strip()],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

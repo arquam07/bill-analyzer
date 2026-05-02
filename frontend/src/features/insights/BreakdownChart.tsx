@@ -52,8 +52,8 @@ export function BreakdownChart({ title, data, isLoading, isError }: Props) {
                 type="category"
                 dataKey="label"
                 stroke="#94a3b8"
-                fontSize={12}
-                width={110}
+                fontSize={11}
+                width={90}
               />
               <Tooltip
                 formatter={(value) => formatMoney(Number(value))}

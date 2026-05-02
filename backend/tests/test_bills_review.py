@@ -25,7 +25,9 @@ class _FakeVision:
     def __init__(self, result: RawBillExtraction) -> None:
         self._result = result
 
-    async def extract_bill(self, image_bytes: bytes) -> RawBillExtraction:
+    async def extract_bill(
+        self, image_bytes: bytes, *, language: str = "en"
+    ) -> RawBillExtraction:
         return self._result
 
 

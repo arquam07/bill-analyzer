@@ -20,6 +20,7 @@ from src.schemas.bill import (
     BillItemCreateRequest,
     BillItemUpdateRequest,
     BillListResponse,
+    BillManualCreateRequest,
     BillResponse,
     BillSummaryResponse,
     BillUpdateRequest,
@@ -53,6 +54,17 @@ async def upload_bill(
         raise HTTPException(
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "unsupported image format"
         ) from exc
+    return BillResponse.model_validate(bill)
+
+
+@router.post("/manual", response_model=BillResponse, status_code=status.HTTP_201_CREATED)
+async def create_manual_bill(
+    body: BillManualCreateRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    storage: StorageBackend = Depends(get_storage),
+) -> BillResponse:
+    bill = await _service(db, storage).create_manual_bill(user=user, fields=body)
     return BillResponse.model_validate(bill)
 
 

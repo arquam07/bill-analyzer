@@ -17,7 +17,7 @@ function Card({
   sub?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded p-4">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4">
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-semibold text-slate-900">{value}</div>
       {sub && <div className="mt-1 text-xs text-slate-500">{sub}</div>}
@@ -27,7 +27,7 @@ function Card({
 
 function Skeleton() {
   return (
-    <div className="bg-white border border-slate-200 rounded p-4">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4">
       <div className="h-3 w-16 bg-slate-200 rounded animate-pulse" />
       <div className="mt-2 h-7 w-24 bg-slate-200 rounded animate-pulse" />
       <div className="mt-2 h-3 w-20 bg-slate-200 rounded animate-pulse" />
@@ -38,7 +38,7 @@ function Skeleton() {
 export function KpiCards({ data, isLoading, isError }: Props) {
   if (isLoading || !data) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} />
         ))}
@@ -63,7 +63,7 @@ export function KpiCards({ data, isLoading, isError }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card
           label="Total spend"
           value={formatMoney(data.total_spend)}

@@ -85,8 +85,15 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
   }
 
   const sendMutation = useMutation({
-    mutationFn: () =>
-      api.create(billId, users.map((u) => u.username), splitBase),
+    mutationFn: () => {
+      const usernames = users.map((u) => u.username);
+      if (itemsWithPrice.length > 0) {
+        return api.create(billId, usernames, {
+          billItemIds: Array.from(checkedIds),
+        });
+      }
+      return api.create(billId, usernames, { totalToSplit: splitBase });
+    },
     onSuccess: () => {
       onSuccess();
       onClose();
@@ -102,10 +109,10 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg sm:mx-4 p-6 space-y-5 max-h-[92vh] overflow-y-auto">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-semibold">Split this bill</h2>

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.exceptions import (
     BillHasNoTotal,
     BillNotFound,
+    SplitItemsInvalid,
     SplitRequestAlreadyExists,
     SplitRequestNotFound,
     SplitRequestNotPending,
@@ -77,16 +78,33 @@ class SplitRequestService:
         bill_id: uuid.UUID,
         from_user: User,
         usernames: list[str],
+        bill_item_ids: list[uuid.UUID] | None,
         total_to_split: float | None,
     ) -> SplitRequestListResponse:
-        bill = await self._bills.get_by_id(bill_id)
+        bill = await self._bills.get_with_items(bill_id)
         if bill is None or bill.user_id != from_user.id:
             raise BillNotFound(str(bill_id))
-        if bill.total is None and total_to_split is None:
-            raise BillHasNoTotal()
 
-        split_base = Decimal(str(total_to_split)) if total_to_split is not None else bill.total
-        assert split_base is not None
+        # Resolve which items are part of the split (if any).
+        selected_priced: list[tuple[uuid.UUID, Decimal]] = []
+        if bill_item_ids:
+            ids_set = set(bill_item_ids)
+            picked = [it for it in bill.items if it.id in ids_set]
+            if len(picked) != len(ids_set):
+                raise SplitItemsInvalid("one or more bill_item_ids do not belong to this bill")
+            for it in picked:
+                if it.total_price is None:
+                    raise SplitItemsInvalid(f"item {it.id} has no price")
+                selected_priced.append((it.id, it.total_price))
+
+        if selected_priced:
+            split_base = sum((p for _, p in selected_priced), Decimal("0"))
+        elif total_to_split is not None:
+            split_base = Decimal(str(total_to_split))
+        elif bill.total is not None:
+            split_base = bill.total
+        else:
+            raise BillHasNoTotal()
 
         # Resolve usernames to users
         recipients: list[User] = []
@@ -100,7 +118,20 @@ class SplitRequestService:
 
         # Equal shares: each person (owner + recipients) pays 1/(n+1) of split_base
         n = len(recipients) + 1
-        share = (split_base / Decimal(n)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # Per-item recipient share = item.total_price / n
+        item_shares: list[tuple[uuid.UUID, Decimal]] = []
+        if selected_priced:
+            for item_id, price in selected_priced:
+                share = (price / Decimal(n)).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                item_shares.append((item_id, share))
+            sr_amount = sum((s for _, s in item_shares), Decimal("0"))
+        else:
+            sr_amount = (split_base / Decimal(n)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
 
         note = bill.merchant if bill.merchant else None
 
@@ -112,8 +143,9 @@ class SplitRequestService:
                 bill_id=bill_id,
                 from_user_id=from_user.id,
                 to_user_id=recipient.id,
-                amount=share,
+                amount=sr_amount,
                 note=note,
+                item_shares=item_shares if item_shares else None,
             )
             created.append(sr)
 

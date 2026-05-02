@@ -4,6 +4,7 @@ import json
 import httpx
 from pydantic import ValidationError
 
+from src.core.constants import BILL_CATEGORIES, DEFAULT_LANGUAGE
 from src.core.exceptions import (
     OllamaResponseError,
     OllamaUnavailable,
@@ -11,27 +12,43 @@ from src.core.exceptions import (
 )
 from src.schemas.extraction import RawBillExtraction
 
-SYSTEM_PROMPT = """You are an OCR engine for retail receipts and bills.
+_LANGUAGE_NAMES = {"en": "English", "ja": "Japanese"}
+
+_CATEGORY_LIST = ", ".join(BILL_CATEGORIES)
+
+
+def _build_system_prompt(language: str) -> str:
+    """Build the OCR prompt. The user's preferred_language controls the *output* language
+    of human-readable text fields (merchant, item names) — receipt source language is
+    detected automatically from the image.
+    """
+    lang_name = _LANGUAGE_NAMES.get(language, "English")
+    return f"""You are an OCR engine for retail receipts and bills.
 Extract structured data from the image and return ONLY valid JSON with this shape:
-{
+{{
   "merchant": string | null,
   "total": number | null,
   "currency": string | null,
   "billed_at": string | null,           // YYYY-MM-DD if a date is visible
+  "category": string | null,            // one of: {_CATEGORY_LIST}
   "items": [
-    {
+    {{
       "name": string,
       "quantity": number | null,
       "unit_price": number | null,
-      "total_price": number | null
-    }
+      "total_price": number | null,
+      "category": string | null         // one of: {_CATEGORY_LIST}
+    }}
   ],
   "raw_text": string                    // every line of text you read, joined by \\n
-}
+}}
 Rules:
 - Output JSON only. No prose, no markdown, no code fences.
 - Use null for fields you cannot read confidently.
-- Numeric fields must be numbers, not strings."""
+- Numeric fields must be numbers, not strings.
+- Translate "merchant" and item "name" fields into {lang_name} when the receipt is in another language. "raw_text" stays in the original language exactly as printed.
+- "category" describes the bill as a whole (e.g. a supermarket = grocery, a restaurant = food). Each item may also have its own category for finer breakdowns. Use null if uncertain."""
+
 
 USER_PROMPT = "Extract the receipt's structured data."
 
@@ -57,14 +74,14 @@ class VisionService:
         if self._owns_client:
             await self._http.aclose()
 
-    async def extract_bill(self, image_bytes: bytes) -> RawBillExtraction:
+    async def extract_bill(
+        self, image_bytes: bytes, *, language: str = DEFAULT_LANGUAGE
+    ) -> RawBillExtraction:
         b64 = base64.b64encode(image_bytes).decode("ascii")
-        print(f"ollama model: {self._model}")
-        print(f"ollama timeout: {self._timeout}")
         payload = {
             "model": self._model,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": _build_system_prompt(language)},
                 {"role": "user", "content": USER_PROMPT, "images": [b64]},
             ],
             "stream": False,

@@ -47,6 +47,8 @@ export const bills = {
     fd.append("image", file);
     return apiRequest<BillResponse>("/bills", { method: "POST", formData: fd });
   },
+  createManual: (body: BillUpdateRequest = {}) =>
+    apiRequest<BillResponse>("/bills/manual", { method: "POST", body }),
   patch: (id: string, body: BillUpdateRequest) =>
     apiRequest<BillResponse>(`/bills/${id}`, { method: "PATCH", body }),
   extract: (id: string) =>
@@ -67,10 +69,18 @@ export const bills = {
 export const splitRequests = {
   getUserByUsername: (username: string) =>
     apiRequest<UserPublicResponse>(`/users/by-username/${encodeURIComponent(username)}`),
-  create: (billId: string, usernames: string[], totalToSplit?: number) =>
+  create: (
+    billId: string,
+    usernames: string[],
+    options: { billItemIds?: string[]; totalToSplit?: number } = {},
+  ) =>
     apiRequest<SplitRequestListResponse>(`/bills/${billId}/split-requests`, {
       method: "POST",
-      body: { usernames, total_to_split: totalToSplit },
+      body: {
+        usernames,
+        bill_item_ids: options.billItemIds,
+        total_to_split: options.totalToSplit,
+      },
     }),
   listIncoming: () => apiRequest<SplitRequestListResponse>("/split-requests/incoming"),
   listOutgoing: () => apiRequest<SplitRequestListResponse>("/split-requests/outgoing"),

@@ -22,7 +22,7 @@ if config.config_file_name is not None:
 # because Alembic runs synchronously.
 _settings = get_settings()
 _sync_url = _settings.database_url.replace("+asyncpg", "+psycopg")
-config.set_main_option("sqlalchemy.url", _sync_url)
+config.set_main_option("sqlalchemy.url", _sync_url.replace("%", "%%"))
 
 target_metadata = Base.metadata
 

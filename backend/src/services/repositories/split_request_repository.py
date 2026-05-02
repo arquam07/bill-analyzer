@@ -12,6 +12,7 @@ from src.models.split_request import (
     STATUS_PENDING,
     STATUS_REJECTED,
     SplitRequest,
+    SplitRequestItem,
     SplitSettlement,
 )
 
@@ -35,6 +36,7 @@ class SplitRequestRepository:
         to_user_id: uuid.UUID,
         amount: Decimal,
         note: str | None,
+        item_shares: list[tuple[uuid.UUID, Decimal]] | None = None,
     ) -> SplitRequest:
         sr = SplitRequest(
             bill_id=bill_id,
@@ -46,6 +48,16 @@ class SplitRequestRepository:
         )
         self._session.add(sr)
         await self._session.flush()
+        if item_shares:
+            for bill_item_id, share in item_shares:
+                self._session.add(
+                    SplitRequestItem(
+                        split_request_id=sr.id,
+                        bill_item_id=bill_item_id,
+                        share_amount=share,
+                    )
+                )
+            await self._session.flush()
         await self._session.refresh(sr, attribute_names=["from_user", "to_user", "bill"])
         return sr
 

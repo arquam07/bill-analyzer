@@ -40,13 +40,13 @@ export function BillsList() {
   }
 
   return (
-    <ul className="divide-y divide-slate-200 bg-white border border-slate-200 rounded">
+    <ul className="divide-y divide-slate-200 bg-white border border-slate-200 rounded-2xl overflow-hidden">
       {data.items.map((b) => (
         <li key={b.id}>
           <Link
             to="/bills/$billId"
             params={{ billId: b.id }}
-            className="flex items-center justify-between px-4 py-3 hover:bg-slate-50"
+            className="flex items-center justify-between px-4 py-4 hover:bg-slate-50"
           >
             <div className="min-w-0">
               <div className="font-medium truncate">

@@ -13,8 +13,8 @@ export function TimeRangePicker({ preset, customFrom, customTo, onChange }: Prop
   const setTo = (v: string) => onChange({ preset: "custom", customFrom, customTo: v });
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="inline-flex rounded border border-slate-200 bg-white overflow-hidden">
+    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
+      <div className="flex overflow-x-auto rounded border border-slate-200 bg-white overflow-hidden max-w-full">
         {PRESETS.map((p) => (
           <button
             key={p}

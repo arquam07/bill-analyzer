@@ -2,13 +2,16 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from sqlalchemy import DateTime, cast, func, select
+from sqlalchemy import ColumnElement, DateTime, cast, func, literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.bill import Bill, BillItem
 from sqlalchemy.sql.selectable import Subquery
 
-from src.models.split_request import STATUS_ACCEPTED, SplitRequest
+from src.models.bill import Bill, BillItem
+from src.models.split_request import (
+    STATUS_ACCEPTED,
+    SplitRequest,
+    SplitRequestItem,
+)
 
 REVIEWED = "reviewed"
 
@@ -29,11 +32,107 @@ def _split_subq(user_id: uuid.UUID) -> Subquery:
     )
 
 
+def _item_share_out_subq(user_id: uuid.UUID) -> Subquery:
+    """Per-item subquery: sum of accepted outgoing per-item split amounts for this user."""
+    return (
+        select(
+            SplitRequestItem.bill_item_id,
+            func.sum(SplitRequestItem.share_amount).label("share_out"),
+        )
+        .join(SplitRequest, SplitRequest.id == SplitRequestItem.split_request_id)
+        .where(
+            SplitRequest.from_user_id == user_id,
+            SplitRequest.status == STATUS_ACCEPTED,
+        )
+        .group_by(SplitRequestItem.bill_item_id)
+        .subquery("item_share_out")
+    )
+
+
 def _effective_total(split_subq: Subquery) -> object:
     """bill.total minus split amounts (floored at 0)."""
     return func.greatest(
         Bill.total - func.coalesce(split_subq.c.split_out, 0), 0
     )
+
+
+def _bill_filters_owner(
+    user_id: uuid.UUID, range_from: date, range_to: date
+) -> list[ColumnElement[bool]]:
+    return [
+        Bill.user_id == user_id,
+        Bill.status == REVIEWED,
+        Bill.billed_at.is_not(None),
+        Bill.billed_at >= range_from,
+        Bill.billed_at <= range_to,
+    ]
+
+
+def _bill_filters_any(range_from: date, range_to: date) -> list[ColumnElement[bool]]:
+    """For incoming queries — bill belongs to someone else but appears in this user's stats."""
+    return [
+        Bill.status == REVIEWED,
+        Bill.billed_at.is_not(None),
+        Bill.billed_at >= range_from,
+        Bill.billed_at <= range_to,
+    ]
+
+
+def _effective_items_subq(
+    user_id: uuid.UUID, range_from: date, range_to: date
+) -> Subquery:
+    """UNION ALL of owner-side items (adjusted for outgoing splits) + incoming item shares.
+
+    Yields one row per "effective item" the user spent on, with bill metadata.
+    """
+    out_share = _item_share_out_subq(user_id)
+
+    # Coalesce per-item category with bill-level category so manual bills + bills where
+    # only the VLM-level category is set still surface in /insights/breakdown?dimension=category.
+    coalesced_category = func.coalesce(BillItem.category, Bill.category)
+
+    owner_q = (
+        select(
+            BillItem.id.label("bill_item_id"),
+            BillItem.name.label("name"),
+            coalesced_category.label("category"),
+            Bill.merchant.label("merchant"),
+            Bill.billed_at.label("billed_at"),
+            func.greatest(
+                func.coalesce(BillItem.total_price, 0)
+                - func.coalesce(out_share.c.share_out, 0),
+                0,
+            ).label("amount"),
+            literal(1).label("cnt"),
+        )
+        .select_from(BillItem)
+        .join(Bill, Bill.id == BillItem.bill_id)
+        .outerjoin(out_share, out_share.c.bill_item_id == BillItem.id)
+        .where(*_bill_filters_owner(user_id, range_from, range_to))
+    )
+
+    incoming_q = (
+        select(
+            SplitRequestItem.bill_item_id.label("bill_item_id"),
+            BillItem.name.label("name"),
+            coalesced_category.label("category"),
+            Bill.merchant.label("merchant"),
+            Bill.billed_at.label("billed_at"),
+            SplitRequestItem.share_amount.label("amount"),
+            literal(1).label("cnt"),
+        )
+        .select_from(SplitRequestItem)
+        .join(SplitRequest, SplitRequest.id == SplitRequestItem.split_request_id)
+        .join(BillItem, BillItem.id == SplitRequestItem.bill_item_id)
+        .join(Bill, Bill.id == BillItem.bill_id)
+        .where(
+            SplitRequest.to_user_id == user_id,
+            SplitRequest.status == STATUS_ACCEPTED,
+            *_bill_filters_any(range_from, range_to),
+        )
+    )
+
+    return union_all(owner_q, incoming_q).subquery("effective_items")
 
 
 class InsightsRepository:
@@ -45,34 +144,68 @@ class InsightsRepository:
     ) -> tuple[float, int]:
         sq = _split_subq(user_id)
         eff = _effective_total(sq)
-        stmt = (
+        owner_stmt = (
             select(
                 func.coalesce(func.sum(eff), 0),
                 func.count(Bill.id),
             )
             .outerjoin(sq, sq.c.bill_id == Bill.id)
-            .where(Bill.user_id == user_id)
-            .where(Bill.status == REVIEWED)
-            .where(Bill.billed_at.is_not(None))
-            .where(Bill.billed_at >= range_from)
-            .where(Bill.billed_at <= range_to)
+            .where(*_bill_filters_owner(user_id, range_from, range_to))
         )
-        row = (await self._session.execute(stmt)).one()
-        return float(row[0] or 0), int(row[1] or 0)
+        incoming_stmt = (
+            select(
+                func.coalesce(func.sum(SplitRequest.amount), 0),
+                func.count(SplitRequest.id),
+            )
+            .select_from(SplitRequest)
+            .join(Bill, Bill.id == SplitRequest.bill_id)
+            .where(
+                SplitRequest.to_user_id == user_id,
+                SplitRequest.status == STATUS_ACCEPTED,
+                *_bill_filters_any(range_from, range_to),
+            )
+        )
+        owner_total, owner_count = (await self._session.execute(owner_stmt)).one()
+        inc_total, inc_count = (await self._session.execute(incoming_stmt)).one()
+        return (
+            float(owner_total or 0) + float(inc_total or 0),
+            int(owner_count or 0) + int(inc_count or 0),
+        )
 
     async def top_merchant(
         self, *, user_id: uuid.UUID, range_from: date, range_to: date
     ) -> str | None:
+        sq = _split_subq(user_id)
+        owner_q = (
+            select(
+                Bill.merchant.label("merchant"),
+                func.greatest(
+                    func.coalesce(Bill.total, 0) - func.coalesce(sq.c.split_out, 0),
+                    0,
+                ).label("amount"),
+            )
+            .outerjoin(sq, sq.c.bill_id == Bill.id)
+            .where(*_bill_filters_owner(user_id, range_from, range_to))
+        )
+        incoming_q = (
+            select(
+                Bill.merchant.label("merchant"),
+                SplitRequest.amount.label("amount"),
+            )
+            .select_from(SplitRequest)
+            .join(Bill, Bill.id == SplitRequest.bill_id)
+            .where(
+                SplitRequest.to_user_id == user_id,
+                SplitRequest.status == STATUS_ACCEPTED,
+                *_bill_filters_any(range_from, range_to),
+            )
+        )
+        combined = union_all(owner_q, incoming_q).subquery("merchant_amounts")
         stmt = (
-            select(Bill.merchant)
-            .where(Bill.user_id == user_id)
-            .where(Bill.status == REVIEWED)
-            .where(Bill.merchant.is_not(None))
-            .where(Bill.billed_at.is_not(None))
-            .where(Bill.billed_at >= range_from)
-            .where(Bill.billed_at <= range_to)
-            .group_by(Bill.merchant)
-            .order_by(func.coalesce(func.sum(Bill.total), 0).desc())
+            select(combined.c.merchant)
+            .where(combined.c.merchant.is_not(None))
+            .group_by(combined.c.merchant)
+            .order_by(func.coalesce(func.sum(combined.c.amount), 0).desc())
             .limit(1)
         )
         return (await self._session.execute(stmt)).scalar_one_or_none()
@@ -80,17 +213,12 @@ class InsightsRepository:
     async def top_category(
         self, *, user_id: uuid.UUID, range_from: date, range_to: date
     ) -> str | None:
+        ei = _effective_items_subq(user_id, range_from, range_to)
         stmt = (
-            select(BillItem.category)
-            .join(Bill, Bill.id == BillItem.bill_id)
-            .where(Bill.user_id == user_id)
-            .where(Bill.status == REVIEWED)
-            .where(BillItem.category.is_not(None))
-            .where(Bill.billed_at.is_not(None))
-            .where(Bill.billed_at >= range_from)
-            .where(Bill.billed_at <= range_to)
-            .group_by(BillItem.category)
-            .order_by(func.coalesce(func.sum(BillItem.total_price), 0).desc())
+            select(ei.c.category)
+            .where(ei.c.category.is_not(None))
+            .group_by(ei.c.category)
+            .order_by(func.coalesce(func.sum(ei.c.amount), 0).desc())
             .limit(1)
         )
         return (await self._session.execute(stmt)).scalar_one_or_none()
@@ -105,28 +233,49 @@ class InsightsRepository:
     ) -> list[tuple[date, float, int]]:
         sq = _split_subq(user_id)
         eff = _effective_total(sq)
-        period = func.date_trunc(granularity, cast(Bill.billed_at, DateTime)).label("period")
-        stmt = (
+        period_owner = func.date_trunc(
+            granularity, cast(Bill.billed_at, DateTime)
+        ).label("period")
+        owner_stmt = (
             select(
-                period,
+                period_owner,
                 func.coalesce(func.sum(eff), 0),
                 func.count(Bill.id),
             )
             .outerjoin(sq, sq.c.bill_id == Bill.id)
-            .where(Bill.user_id == user_id)
-            .where(Bill.status == REVIEWED)
-            .where(Bill.billed_at.is_not(None))
-            .where(Bill.billed_at >= range_from)
-            .where(Bill.billed_at <= range_to)
-            .group_by(period)
-            .order_by(period)
+            .where(*_bill_filters_owner(user_id, range_from, range_to))
+            .group_by(period_owner)
         )
-        rows = (await self._session.execute(stmt)).all()
-        out: list[tuple[date, float, int]] = []
-        for ts, total, count in rows:
+        period_inc = func.date_trunc(
+            granularity, cast(Bill.billed_at, DateTime)
+        ).label("period")
+        incoming_stmt = (
+            select(
+                period_inc,
+                func.coalesce(func.sum(SplitRequest.amount), 0),
+                func.count(SplitRequest.id),
+            )
+            .select_from(SplitRequest)
+            .join(Bill, Bill.id == SplitRequest.bill_id)
+            .where(
+                SplitRequest.to_user_id == user_id,
+                SplitRequest.status == STATUS_ACCEPTED,
+                *_bill_filters_any(range_from, range_to),
+            )
+            .group_by(period_inc)
+        )
+        owner_rows = (await self._session.execute(owner_stmt)).all()
+        inc_rows = (await self._session.execute(incoming_stmt)).all()
+
+        bucket: dict[date, tuple[float, int]] = {}
+        for ts, total, count in list(owner_rows) + list(inc_rows):
             d: date = ts.date() if isinstance(ts, datetime) else ts
-            out.append((d, float(total or 0), int(count or 0)))
-        return out
+            cur_t, cur_c = bucket.get(d, (0.0, 0))
+            bucket[d] = (cur_t + float(total or 0), cur_c + int(count or 0))
+        return sorted(
+            [(d, t, c) for d, (t, c) in bucket.items()],
+            key=lambda r: r[0],
+        )
 
     async def breakdown(
         self,
@@ -138,39 +287,57 @@ class InsightsRepository:
         limit: int,
     ) -> list[tuple[str, float, int]]:
         if dimension == "category":
-            total_expr = func.coalesce(func.sum(BillItem.total_price), 0)
+            ei = _effective_items_subq(user_id, range_from, range_to)
+            total_expr = func.coalesce(func.sum(ei.c.amount), 0)
             stmt = (
                 select(
-                    BillItem.category,
+                    ei.c.category,
                     total_expr,
-                    func.count(BillItem.id),
+                    func.coalesce(func.sum(ei.c.cnt), 0),
                 )
-                .join(Bill, Bill.id == BillItem.bill_id)
-                .where(Bill.user_id == user_id)
-                .where(Bill.status == REVIEWED)
-                .where(BillItem.category.is_not(None))
-                .where(Bill.billed_at.is_not(None))
-                .where(Bill.billed_at >= range_from)
-                .where(Bill.billed_at <= range_to)
-                .group_by(BillItem.category)
+                .where(ei.c.category.is_not(None))
+                .group_by(ei.c.category)
                 .order_by(total_expr.desc())
                 .limit(limit)
             )
         else:  # merchant
-            total_expr = func.coalesce(func.sum(Bill.total), 0)
+            sq = _split_subq(user_id)
+            owner_q = (
+                select(
+                    Bill.merchant.label("merchant"),
+                    func.greatest(
+                        func.coalesce(Bill.total, 0) - func.coalesce(sq.c.split_out, 0),
+                        0,
+                    ).label("amount"),
+                    literal(1).label("cnt"),
+                )
+                .outerjoin(sq, sq.c.bill_id == Bill.id)
+                .where(*_bill_filters_owner(user_id, range_from, range_to))
+            )
+            incoming_q = (
+                select(
+                    Bill.merchant.label("merchant"),
+                    SplitRequest.amount.label("amount"),
+                    literal(1).label("cnt"),
+                )
+                .select_from(SplitRequest)
+                .join(Bill, Bill.id == SplitRequest.bill_id)
+                .where(
+                    SplitRequest.to_user_id == user_id,
+                    SplitRequest.status == STATUS_ACCEPTED,
+                    *_bill_filters_any(range_from, range_to),
+                )
+            )
+            combined = union_all(owner_q, incoming_q).subquery("merchant_amounts")
+            total_expr = func.coalesce(func.sum(combined.c.amount), 0)
             stmt = (
                 select(
-                    Bill.merchant,
+                    combined.c.merchant,
                     total_expr,
-                    func.count(Bill.id),
+                    func.coalesce(func.sum(combined.c.cnt), 0),
                 )
-                .where(Bill.user_id == user_id)
-                .where(Bill.status == REVIEWED)
-                .where(Bill.merchant.is_not(None))
-                .where(Bill.billed_at.is_not(None))
-                .where(Bill.billed_at >= range_from)
-                .where(Bill.billed_at <= range_to)
-                .group_by(Bill.merchant)
+                .where(combined.c.merchant.is_not(None))
+                .group_by(combined.c.merchant)
                 .order_by(total_expr.desc())
                 .limit(limit)
             )
@@ -186,24 +353,18 @@ class InsightsRepository:
         order_by: Literal["spend", "frequency"],
         limit: int,
     ) -> list[tuple[str, str, float, int, date | None]]:
-        # Normalize: lower + collapse internal whitespace + trim.
+        ei = _effective_items_subq(user_id, range_from, range_to)
         normalized = func.regexp_replace(
-            func.btrim(func.lower(BillItem.name)), r"\s+", " ", "g"
+            func.btrim(func.lower(ei.c.name)), r"\s+", " ", "g"
         ).label("normalized")
-        display = func.min(BillItem.name).label("display")
-        total = func.coalesce(func.sum(BillItem.total_price), 0).label("total")
-        count = func.count(BillItem.id).label("count")
-        last_purchased = func.max(Bill.billed_at).label("last_purchased")
+        display = func.min(ei.c.name).label("display")
+        total = func.coalesce(func.sum(ei.c.amount), 0).label("total")
+        count = func.coalesce(func.sum(ei.c.cnt), 0).label("count")
+        last_purchased = func.max(ei.c.billed_at).label("last_purchased")
         order_col = total if order_by == "spend" else count
 
         stmt = (
             select(display, normalized, total, count, last_purchased)
-            .join(Bill, Bill.id == BillItem.bill_id)
-            .where(Bill.user_id == user_id)
-            .where(Bill.status == REVIEWED)
-            .where(Bill.billed_at.is_not(None))
-            .where(Bill.billed_at >= range_from)
-            .where(Bill.billed_at <= range_to)
             .group_by(normalized)
             .order_by(order_col.desc())
             .limit(limit)
@@ -235,23 +396,18 @@ class InsightsRepository:
         range_to: date,
         granularity: str,
     ) -> tuple[float, int, list[tuple[date, float, int]]]:
+        ei = _effective_items_subq(user_id, range_from, range_to)
         normalized_expr = func.regexp_replace(
-            func.btrim(func.lower(BillItem.name)), r"\s+", " ", "g"
+            func.btrim(func.lower(ei.c.name)), r"\s+", " ", "g"
         )
-        period = func.date_trunc(granularity, cast(Bill.billed_at, DateTime)).label("period")
+        period = func.date_trunc(granularity, cast(ei.c.billed_at, DateTime)).label("period")
 
         stmt = (
             select(
                 period,
-                func.coalesce(func.sum(BillItem.total_price), 0),
-                func.count(BillItem.id),
+                func.coalesce(func.sum(ei.c.amount), 0),
+                func.coalesce(func.sum(ei.c.cnt), 0),
             )
-            .join(Bill, Bill.id == BillItem.bill_id)
-            .where(Bill.user_id == user_id)
-            .where(Bill.status == REVIEWED)
-            .where(Bill.billed_at.is_not(None))
-            .where(Bill.billed_at >= range_from)
-            .where(Bill.billed_at <= range_to)
             .where(normalized_expr == normalized_name)
             .group_by(period)
             .order_by(period)
