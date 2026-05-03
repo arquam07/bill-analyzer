@@ -92,3 +92,23 @@ class SplitWithSelf(AppError):
 
 class SplitItemsInvalid(AppError):
     """One or more bill_item_ids don't belong to the bill or have no price."""
+
+
+class FriendRequestNotFound(AppError):
+    pass
+
+
+class FriendRequestNotPending(AppError):
+    """Accept/reject attempted on a non-pending friend request."""
+
+
+class FriendRequestNotRecipient(AppError):
+    """User tried to accept/reject a friend request they didn't receive."""
+
+
+class FriendRequestAlreadyExists(AppError):
+    """A pending friendship already exists between these users."""
+
+
+class AlreadyFriends(AppError):
+    pass

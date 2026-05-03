@@ -27,11 +27,13 @@ from src.schemas.split_request import (
     BalanceRow,
     BalancesResponse,
     BillSummary,
+    NonFriendInfo,
     SettlementResponse,
     SplitRequestListResponse,
     SplitRequestResponse,
 )
 from src.services.repositories.bill_repository import BillRepository
+from src.services.repositories.friendship_repository import FriendshipRepository
 from src.services.repositories.split_request_repository import SplitRequestRepository
 from src.services.repositories.user_repository import UserRepository
 
@@ -65,6 +67,7 @@ class SplitRequestService:
         self._repo = SplitRequestRepository(session)
         self._bills = BillRepository(session)
         self._users = UserRepository(session)
+        self._friends = FriendshipRepository(session)
 
     async def get_user_by_username(self, username: str) -> User:
         user = await self._users.get_by_username(username)
@@ -136,7 +139,18 @@ class SplitRequestService:
         note = bill.merchant if bill.merchant else None
 
         created: list[SplitRequest] = []
+        non_friends: list[NonFriendInfo] = []
         for recipient in recipients:
+            is_friend = await self._friends.are_friends(from_user.id, recipient.id)
+            if not is_friend:
+                non_friends.append(
+                    NonFriendInfo(
+                        username=recipient.username,
+                        amount=float(sr_amount),
+                        bill_item_ids=[iid for iid, _ in item_shares] if item_shares else None,
+                    )
+                )
+                continue
             if await self._repo.pending_exists(bill_id, from_user.id, recipient.id):
                 raise SplitRequestAlreadyExists()
             sr = await self._repo.create(
@@ -150,7 +164,10 @@ class SplitRequestService:
             created.append(sr)
 
         await self._session.commit()
-        return SplitRequestListResponse(items=[_sr_to_response(sr) for sr in created])
+        return SplitRequestListResponse(
+            items=[_sr_to_response(sr) for sr in created],
+            non_friends=non_friends,
+        )
 
     async def list_incoming(self, user: User) -> SplitRequestListResponse:
         items = await self._repo.list_incoming(user.id)

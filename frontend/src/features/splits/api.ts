@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { splitRequests as api } from "~/api/endpoints";
+import { friends as friendsApi, splitRequests as api } from "~/api/endpoints";
 
 export function useIncomingRequests(enabled = true) {
   return useQuery({
@@ -53,6 +53,57 @@ export function useSettle() {
       api.settle(body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["balances"] });
+    },
+  });
+}
+
+export function useFriends(enabled = true) {
+  return useQuery({
+    queryKey: ["friends"],
+    queryFn: () => friendsApi.list(),
+    enabled,
+  });
+}
+
+export function useIncomingFriendRequests(enabled = true) {
+  return useQuery({
+    queryKey: ["friend-requests", "incoming"],
+    queryFn: () => friendsApi.listIncoming(),
+    enabled,
+  });
+}
+
+export function useAcceptFriendRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => friendsApi.accept(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["friend-requests"] });
+      void qc.invalidateQueries({ queryKey: ["friends"] });
+      void qc.invalidateQueries({ queryKey: ["split-requests"] });
+    },
+  });
+}
+
+export function useRejectFriendRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => friendsApi.reject(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["friend-requests"] });
+    },
+  });
+}
+
+export function useSendFriendRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      username: string;
+      deferred_split?: { bill_id: string; amount: number; bill_item_ids?: string[] };
+    }) => friendsApi.sendRequest(body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["friend-requests"] });
     },
   });
 }

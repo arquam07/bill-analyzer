@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { splitRequests as api } from "~/api/endpoints";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { friends as friendsApi, splitRequests as api } from "~/api/endpoints";
 import { ApiError } from "~/api/fetcher";
-import type { BillItemResponse, UserPublicResponse } from "~/api/types";
+import type { BillItemResponse, NonFriendInfo } from "~/api/types";
 
 interface Props {
   billId: string;
@@ -25,6 +25,20 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
   const [users, setUsers] = useState<AddedUser[]>([]);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [isLooking, setIsLooking] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [nonFriendQueue, setNonFriendQueue] = useState<NonFriendInfo[] | null>(null);
+
+  const friendsQuery = useQuery({
+    queryKey: ["friends"],
+    queryFn: () => friendsApi.list(),
+  });
+  const friendsList = friendsQuery.data?.friends ?? [];
+
+  const suggestions = rawInput.length >= 1
+    ? friendsList
+        .filter((f) => f.username.startsWith(rawInput) && !users.some((u) => u.username === f.username))
+        .slice(0, 6)
+    : [];
 
   // Item selection — default all checked
   const itemsWithPrice = items.filter((it) => it.total_price !== null && it.total_price !== undefined);
@@ -37,7 +51,6 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
     .filter((it) => checkedIds.has(it.id))
     .reduce((s, it) => s + (it.total_price ?? 0), 0);
 
-  // If no items have prices, fall back to bill total
   const splitBase = itemsWithPrice.length > 0 ? selectedTotal : total;
   const n = users.length + 1;
   const share = users.length === 0 ? splitBase : Math.round((splitBase / n) * 100) / 100;
@@ -56,6 +69,13 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
     });
   }
 
+  function selectFriend(f: { user_id: string; username: string; name: string | null }) {
+    setUsers((prev) => [...prev, { id: f.user_id, username: f.username, name: f.name }]);
+    setRawInput("");
+    setShowDropdown(false);
+    inputRef.current?.focus();
+  }
+
   async function addUser() {
     const username = rawInput.trim().toLowerCase();
     if (!username) return;
@@ -63,14 +83,19 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
       setLookupError("Already added");
       return;
     }
+
+    // If it's a friend, add directly without lookup
+    const friend = friendsList.find((f) => f.username === username);
+    if (friend) {
+      selectFriend(friend);
+      return;
+    }
+
     setLookupError(null);
     setIsLooking(true);
     try {
-      const found: UserPublicResponse = await api.getUserByUsername(username);
-      setUsers((prev) => [
-        ...prev,
-        { id: found.id, username: found.username, name: found.name },
-      ]);
+      const found = await api.getUserByUsername(username);
+      setUsers((prev) => [...prev, { id: found.id, username: found.username, name: found.name }]);
       setRawInput("");
       inputRef.current?.focus();
     } catch (err) {
@@ -84,19 +109,40 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
     }
   }
 
+  const sendFriendMutation = useMutation({
+    mutationFn: async (nonFriends: NonFriendInfo[]) => {
+      for (const nf of nonFriends) {
+        await friendsApi.sendRequest({
+          username: nf.username,
+          deferred_split: {
+            bill_id: billId,
+            amount: nf.amount,
+            bill_item_ids: nf.bill_item_ids ?? undefined,
+          },
+        });
+      }
+    },
+    onSettled: () => {
+      onSuccess();
+      onClose();
+    },
+  });
+
   const sendMutation = useMutation({
     mutationFn: () => {
       const usernames = users.map((u) => u.username);
       if (itemsWithPrice.length > 0) {
-        return api.create(billId, usernames, {
-          billItemIds: Array.from(checkedIds),
-        });
+        return api.create(billId, usernames, { billItemIds: Array.from(checkedIds) });
       }
       return api.create(billId, usernames, { totalToSplit: splitBase });
     },
-    onSuccess: () => {
-      onSuccess();
-      onClose();
+    onSuccess: (result) => {
+      if (result.non_friends.length > 0) {
+        setNonFriendQueue(result.non_friends);
+      } else {
+        onSuccess();
+        onClose();
+      }
     },
   });
 
@@ -106,6 +152,58 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
       : sendMutation.error
         ? "Failed to send requests."
         : null;
+
+  // Non-friend confirmation screen
+  if (nonFriendQueue !== null) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-2xl shadow-xl w-full sm:max-w-md mx-4 p-6 space-y-4">
+          <h2 className="text-lg font-semibold">Not in your friends list</h2>
+          <p className="text-sm text-slate-600">
+            {nonFriendQueue.length === 1
+              ? "This user is"
+              : "These users are"}{" "}
+            not in your friends list. Send a friend request? Once accepted, the split request will
+            be sent automatically.
+          </p>
+          <ul className="space-y-1.5 border border-slate-200 rounded p-3 bg-slate-50">
+            {nonFriendQueue.map((nf) => (
+              <li key={nf.username} className="flex justify-between text-sm">
+                <span className="font-medium">@{nf.username}</span>
+                <span className="font-mono text-slate-600">{nf.amount.toFixed(2)}</span>
+              </li>
+            ))}
+          </ul>
+          {sendFriendMutation.isError && (
+            <p className="text-xs text-red-600">
+              {sendFriendMutation.error instanceof ApiError
+                ? sendFriendMutation.error.detail
+                : "Failed to send some friend requests."}
+            </p>
+          )}
+          <div className="flex gap-3 justify-end pt-1">
+            <button
+              type="button"
+              onClick={() => { onSuccess(); onClose(); }}
+              className="text-sm text-slate-600 hover:text-slate-900 px-3 py-2"
+            >
+              Skip
+            </button>
+            <button
+              type="button"
+              disabled={sendFriendMutation.isPending}
+              onClick={() => sendFriendMutation.mutate(nonFriendQueue)}
+              className="bg-slate-900 text-white text-sm rounded px-4 py-2 disabled:opacity-50"
+            >
+              {sendFriendMutation.isPending
+                ? "Sending…"
+                : `Send friend request${nonFriendQueue.length !== 1 ? "s" : ""}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -166,33 +264,57 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
           </div>
         )}
 
-        {/* Username input */}
+        {/* Username input with friends dropdown */}
         <div className="space-y-1">
           <label className="block text-sm font-medium text-slate-700">
             Add people to split with
           </label>
-          <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="username"
-              value={rawInput}
-              onChange={(e) =>
-                setRawInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""))
-              }
-              onKeyDown={(e) => e.key === "Enter" && void addUser()}
-              className="flex-1 border border-slate-300 rounded px-3 py-2 text-sm"
-              disabled={isLooking}
-              autoFocus={itemsWithPrice.length === 0}
-            />
-            <button
-              type="button"
-              onClick={() => void addUser()}
-              disabled={!rawInput.trim() || isLooking}
-              className="bg-slate-800 text-white text-sm rounded px-4 py-2 disabled:opacity-50"
-            >
-              {isLooking ? "…" : "Add"}
-            </button>
+          <div className="relative">
+            <div className="flex gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder={friendsList.length > 0 ? "Search friends or type username…" : "username"}
+                value={rawInput}
+                onChange={(e) => {
+                  setRawInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""));
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                onKeyDown={(e) => e.key === "Enter" && void addUser()}
+                className="flex-1 border border-slate-300 rounded px-3 py-2 text-sm"
+                disabled={isLooking}
+                autoFocus={itemsWithPrice.length === 0}
+              />
+              <button
+                type="button"
+                onClick={() => void addUser()}
+                disabled={!rawInput.trim() || isLooking}
+                className="bg-slate-800 text-white text-sm rounded px-4 py-2 disabled:opacity-50"
+              >
+                {isLooking ? "…" : "Add"}
+              </button>
+            </div>
+
+            {/* Friends dropdown suggestions */}
+            {showDropdown && suggestions.length > 0 && (
+              <ul className="absolute z-10 left-0 right-12 mt-1 bg-white border border-slate-200 rounded shadow-lg max-h-48 overflow-y-auto text-sm">
+                {suggestions.map((f) => (
+                  <li key={f.user_id}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectFriend(f)}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
+                    >
+                      <span className="font-medium">@{f.username}</span>
+                      {f.name && <span className="text-slate-500 text-xs">{f.name}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           {lookupError && <p className="text-xs text-red-600">{lookupError}</p>}
         </div>
@@ -205,6 +327,9 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
                 <span>
                   <span className="font-medium">@{u.username}</span>
                   {u.name && <span className="ml-1.5 text-slate-500">{u.name}</span>}
+                  {friendsList.some((f) => f.user_id === u.id) && (
+                    <span className="ml-1.5 text-xs text-emerald-600">friend</span>
+                  )}
                 </span>
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-slate-700">{share.toFixed(2)}</span>
@@ -257,7 +382,11 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
           </button>
           <button
             type="button"
-            disabled={users.length === 0 || sendMutation.isPending || (itemsWithPrice.length > 0 && checkedIds.size === 0)}
+            disabled={
+              users.length === 0 ||
+              sendMutation.isPending ||
+              (itemsWithPrice.length > 0 && checkedIds.size === 0)
+            }
             onClick={() => sendMutation.mutate()}
             className="bg-slate-900 text-white text-sm rounded px-4 py-2 disabled:opacity-50"
           >

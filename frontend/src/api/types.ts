@@ -121,8 +121,40 @@ export interface SplitRequestResponse {
   bill: SplitRequestBillSummary;
 }
 
+export interface NonFriendInfo {
+  username: string;
+  amount: number;
+  bill_item_ids: string[] | null;
+}
+
 export interface SplitRequestListResponse {
   items: SplitRequestResponse[];
+  non_friends: NonFriendInfo[];
+}
+
+// --- Friends ---
+
+export interface FriendResponse {
+  user_id: string;
+  username: string;
+  name: string | null;
+}
+
+export interface FriendListResponse {
+  friends: FriendResponse[];
+}
+
+export interface FriendRequestResponse {
+  id: string;
+  requester_username: string;
+  addressee_username: string;
+  status: "pending" | "accepted" | "rejected";
+  created_at: string;
+  responded_at: string | null;
+}
+
+export interface FriendRequestListResponse {
+  items: FriendRequestResponse[];
 }
 
 export interface BalanceRow {

@@ -7,6 +7,9 @@ import type {
   BillResponse,
   BillUpdateRequest,
   Dimension,
+  FriendListResponse,
+  FriendRequestListResponse,
+  FriendRequestResponse,
   Granularity,
   InsightsBreakdownResponse,
   InsightsOverviewResponse,
@@ -91,6 +94,20 @@ export const splitRequests = {
   balances: () => apiRequest<BalancesResponse>("/balances"),
   settle: (body: { username: string; amount: number; note?: string }) =>
     apiRequest<SettlementResponse>("/settlements", { method: "POST", body }),
+};
+
+export const friends = {
+  list: () => apiRequest<FriendListResponse>("/friends"),
+  sendRequest: (body: {
+    username: string;
+    deferred_split?: { bill_id: string; amount: number; bill_item_ids?: string[] };
+  }) => apiRequest<FriendRequestResponse>("/friends/requests", { method: "POST", body }),
+  listIncoming: () => apiRequest<FriendRequestListResponse>("/friends/requests/incoming"),
+  listOutgoing: () => apiRequest<FriendRequestListResponse>("/friends/requests/outgoing"),
+  accept: (id: string) =>
+    apiRequest<FriendRequestResponse>(`/friends/requests/${id}/accept`, { method: "POST" }),
+  reject: (id: string) =>
+    apiRequest<FriendRequestResponse>(`/friends/requests/${id}/reject`, { method: "POST" }),
 };
 
 function rangeQs(params: { from: string; to: string }) {

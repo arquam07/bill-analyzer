@@ -8,6 +8,7 @@ from sqlalchemy import text
 
 from src.api.auth import router as auth_router
 from src.api.bills import router as bills_router
+from src.api.friends import router as friends_router
 from src.api.health import router as health_router
 from src.api.insights import router as insights_router
 from src.api.me import router as me_router
@@ -65,4 +66,5 @@ app.include_router(me_router)
 app.include_router(bills_router)
 app.include_router(splits_router)
 app.include_router(split_requests_router)
+app.include_router(friends_router)
 app.include_router(insights_router)

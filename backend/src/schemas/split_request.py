@@ -29,8 +29,15 @@ class SplitRequestResponse(BaseModel):
     bill: BillSummary
 
 
+class NonFriendInfo(BaseModel):
+    username: str
+    amount: float
+    bill_item_ids: list[uuid.UUID] | None = None
+
+
 class SplitRequestListResponse(BaseModel):
     items: list[SplitRequestResponse]
+    non_friends: list[NonFriendInfo] = []
 
 
 class UserPublicResponse(BaseModel):

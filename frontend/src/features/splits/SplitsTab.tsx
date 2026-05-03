@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { ApiError } from "~/api/fetcher";
-import type { SplitRequestResponse } from "~/api/types";
+import type { FriendRequestResponse, SplitRequestResponse } from "~/api/types";
 import {
+  useAcceptFriendRequest,
   useAcceptRequest,
   useBalances,
+  useIncomingFriendRequests,
   useIncomingRequests,
   useOutgoingRequests,
+  useRejectFriendRequest,
   useRejectRequest,
   useSettle,
 } from "./api";
@@ -144,16 +147,60 @@ function SettleForm({ username }: { username: string }) {
   );
 }
 
+function FriendRequestCard({ fr }: { fr: FriendRequestResponse }) {
+  const accept = useAcceptFriendRequest();
+  const reject = useRejectFriendRequest();
+
+  return (
+    <div className="border border-slate-200 rounded-2xl p-4 space-y-2 bg-white">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">
+            <span className="text-slate-500">From</span> <span>@{fr.requester_username}</span>
+          </p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {new Date(fr.created_at).toLocaleDateString()}
+          </p>
+        </div>
+        <span className="text-xs bg-blue-50 text-blue-700 rounded px-2 py-0.5 uppercase tracking-wide">
+          Friend request
+        </span>
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={accept.isPending}
+          onClick={() => accept.mutate(fr.id)}
+          className="flex-1 bg-emerald-700 text-white text-sm rounded-lg px-3 py-2.5 disabled:opacity-50 font-medium"
+        >
+          {accept.isPending ? "…" : "Accept"}
+        </button>
+        <button
+          type="button"
+          disabled={reject.isPending}
+          onClick={() => reject.mutate(fr.id)}
+          className="flex-1 bg-white border border-slate-300 text-sm rounded-lg px-3 py-2.5 disabled:opacity-50 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+        >
+          {reject.isPending ? "…" : "Decline"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SplitsTab({ enabled = true }: { enabled?: boolean }) {
   const incoming = useIncomingRequests(enabled);
   const outgoing = useOutgoingRequests(enabled);
   const balances = useBalances(enabled);
+  const friendRequests = useIncomingFriendRequests(enabled);
 
   const pendingIn = incoming.data?.items.filter((r) => r.status === "pending") ?? [];
   const declinedIn = incoming.data?.items.filter((r) => r.status === "rejected") ?? [];
   const outgoingItems = outgoing.data?.items ?? [];
+  const pendingFriendRequests = friendRequests.data?.items ?? [];
 
-  const isLoading = incoming.isLoading || outgoing.isLoading || balances.isLoading;
+  const isLoading =
+    incoming.isLoading || outgoing.isLoading || balances.isLoading || friendRequests.isLoading;
   if (isLoading) return <p className="text-slate-500">Loading…</p>;
 
   const loadError = incoming.error ?? outgoing.error ?? balances.error;
@@ -167,6 +214,23 @@ export function SplitsTab({ enabled = true }: { enabled?: boolean }) {
 
   return (
     <div className="space-y-8">
+      {/* Incoming friend requests */}
+      {pendingFriendRequests.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-medium text-slate-800">
+            Friend requests{" "}
+            <span className="ml-1 bg-blue-100 text-blue-800 text-xs rounded-full px-2 py-0.5">
+              {pendingFriendRequests.length}
+            </span>
+          </h2>
+          <div className="space-y-2">
+            {pendingFriendRequests.map((fr) => (
+              <FriendRequestCard key={fr.id} fr={fr} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Balances */}
       {(balances.data?.balances.length ?? 0) > 0 && (
         <section className="space-y-3">
@@ -241,6 +305,7 @@ export function SplitsTab({ enabled = true }: { enabled?: boolean }) {
 
       {pendingIn.length === 0 &&
         outgoingItems.length === 0 &&
+        pendingFriendRequests.length === 0 &&
         (balances.data?.balances.length ?? 0) === 0 && (
           <p className="text-sm text-slate-500">
             No split activity yet. Split a bill from the bill detail page.
