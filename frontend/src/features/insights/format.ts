@@ -1,11 +1,16 @@
-const moneyFmt = new Intl.NumberFormat(undefined, {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 2,
-});
+const fmtCache = new Map<string, Intl.NumberFormat>();
 
-export function formatMoney(value: number): string {
-  return moneyFmt.format(value);
+function getMoneyFmt(currency: string): Intl.NumberFormat {
+  let fmt = fmtCache.get(currency);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(undefined, { style: "currency", currency });
+    fmtCache.set(currency, fmt);
+  }
+  return fmt;
+}
+
+export function formatMoney(value: number, currency = "JPY"): string {
+  return getMoneyFmt(currency).format(value);
 }
 
 export function formatDelta(pct: number | null): { text: string; tone: "up" | "down" | "flat" } {

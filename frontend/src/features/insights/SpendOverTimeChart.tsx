@@ -8,6 +8,7 @@ import {
   YAxis,
 } from "recharts";
 import type { Granularity, InsightsTimeseriesResponse } from "~/api/types";
+import { useCurrency } from "./CurrencyContext";
 import { formatMoney, formatPeriodLabel } from "./format";
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function SpendOverTimeChart({ data, granularity, isLoading, isError }: Props) {
+  const { currency } = useCurrency();
   return (
     <div className="bg-white border border-slate-200 rounded p-4">
       <div className="flex items-baseline justify-between mb-3">
@@ -51,13 +53,13 @@ export function SpendOverTimeChart({ data, granularity, isLoading, isError }: Pr
                 fontSize={12}
               />
               <YAxis
-                tickFormatter={(v) => formatMoney(Number(v))}
+                tickFormatter={(v) => formatMoney(Number(v), currency)}
                 stroke="#94a3b8"
                 fontSize={12}
                 width={70}
               />
               <Tooltip
-                formatter={(value) => formatMoney(Number(value))}
+                formatter={(value) => formatMoney(Number(value), currency)}
                 labelFormatter={(label) => formatPeriodLabel(String(label), granularity)}
               />
               <Line

@@ -12,6 +12,7 @@ import type {
   BillResponse,
   BillUpdateRequest,
 } from "~/api/types";
+import { CURRENCIES } from "~/features/insights/currencies";
 
 const EXTRACTION_MESSAGES = [
   "Reading receipt…",
@@ -167,15 +168,22 @@ function BillFields({
       </label>
       <label className="text-sm">
         <span className="text-slate-600 font-medium">Currency</span>
-        <input
-          type="text"
-          maxLength={8}
+        <select
           disabled={locked}
           value={currency}
-          onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-          onBlur={() => commitIfChanged("currency", currency || null, bill.currency ?? null)}
+          onChange={(e) => {
+            setCurrency(e.target.value);
+            onSave({ currency: e.target.value || null });
+          }}
           className={inputCls}
-        />
+        >
+          <option value="">— select —</option>
+          {CURRENCIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.code} — {c.name}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="text-sm">
         <span className="text-slate-600 font-medium">Billed at</span>

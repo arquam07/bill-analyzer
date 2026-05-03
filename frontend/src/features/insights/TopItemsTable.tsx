@@ -1,4 +1,5 @@
 import type { InsightsTopItemsResponse, ItemOrderBy } from "~/api/types";
+import { useCurrency } from "./CurrencyContext";
 import { formatMoney } from "./format";
 
 interface Props {
@@ -22,6 +23,7 @@ export function TopItemsTable({
   onOrderByChange,
   onSelect,
 }: Props) {
+  const { currency } = useCurrency();
   return (
     <div className="bg-white border border-slate-200 rounded">
       <div className="flex items-center justify-between p-4 border-b border-slate-200">
@@ -79,7 +81,7 @@ export function TopItemsTable({
                     {titleCase(row.normalized_name) || row.name}
                   </td>
                   <td className="py-2 text-right font-mono">
-                    {formatMoney(row.total_spend)}
+                    {formatMoney(row.total_spend, currency)}
                   </td>
                   <td className="py-2 text-right text-slate-600">
                     {row.purchase_count}

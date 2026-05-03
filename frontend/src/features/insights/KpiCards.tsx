@@ -1,4 +1,5 @@
 import type { InsightsOverviewResponse } from "~/api/types";
+import { useCurrency } from "./CurrencyContext";
 import { formatDelta, formatMoney } from "./format";
 
 interface Props {
@@ -53,6 +54,7 @@ export function KpiCards({ data, isLoading, isError }: Props) {
     );
   }
 
+  const { currency } = useCurrency();
   const delta = formatDelta(data.spend_delta_pct);
   const deltaTone =
     delta.tone === "up"
@@ -66,7 +68,7 @@ export function KpiCards({ data, isLoading, isError }: Props) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card
           label="Total spend"
-          value={formatMoney(data.total_spend)}
+          value={formatMoney(data.total_spend, currency)}
           sub={
             <span>
               <span className={deltaTone}>{delta.text}</span> vs prior period
@@ -74,7 +76,7 @@ export function KpiCards({ data, isLoading, isError }: Props) {
           }
         />
         <Card label="Bills" value={String(data.bill_count)} />
-        <Card label="Avg bill" value={formatMoney(data.avg_bill)} />
+        <Card label="Avg bill" value={formatMoney(data.avg_bill, currency)} />
         <Card
           label="Top merchant"
           value={data.top_merchant ?? "—"}

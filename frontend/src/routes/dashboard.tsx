@@ -25,6 +25,8 @@ import {
   resolveRange,
   type Preset,
 } from "~/features/insights/range";
+import { CurrencyProvider, useCurrency } from "~/features/insights/CurrencyContext";
+import { CURRENCIES } from "~/features/insights/currencies";
 import type { ItemOrderBy } from "~/api/types";
 
 type Tab = "insights" | "history" | "splits";
@@ -116,6 +118,24 @@ function AddBillMenu() {
   );
 }
 
+function CurrencyPicker() {
+  const { currency, setCurrency } = useCurrency();
+  return (
+    <select
+      value={currency}
+      onChange={(e) => setCurrency(e.target.value)}
+      className="text-sm border border-slate-300 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
+      aria-label="Display currency"
+    >
+      {CURRENCIES.map((c) => (
+        <option key={c.code} value={c.code}>
+          {c.code} — {c.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -183,21 +203,24 @@ function DashboardPage() {
       {tab === "splits" ? (
         <SplitsTab enabled={splitsEnabled} />
       ) : tab === "insights" ? (
-        <>
-          <TimeRangePicker
-            preset={preset}
-            customFrom={search.from ?? ""}
-            customTo={search.to ?? ""}
-            onChange={(next) =>
-              setSearch({
-                preset: next.preset,
-                from:
-                  next.preset === "custom" ? next.customFrom || undefined : undefined,
-                to:
-                  next.preset === "custom" ? next.customTo || undefined : undefined,
-              })
-            }
-          />
+        <CurrencyProvider>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <TimeRangePicker
+              preset={preset}
+              customFrom={search.from ?? ""}
+              customTo={search.to ?? ""}
+              onChange={(next) =>
+                setSearch({
+                  preset: next.preset,
+                  from:
+                    next.preset === "custom" ? next.customFrom || undefined : undefined,
+                  to:
+                    next.preset === "custom" ? next.customTo || undefined : undefined,
+                })
+              }
+            />
+            <CurrencyPicker />
+          </div>
           <KpiCards
             data={overview.data}
             isLoading={overview.isLoading}
@@ -239,7 +262,7 @@ function DashboardPage() {
             granularity={granularity}
             onClose={() => setSelectedItem(null)}
           />
-        </>
+        </CurrencyProvider>
       ) : (
         <BillsList />
       )}

@@ -8,6 +8,7 @@ import {
   YAxis,
 } from "recharts";
 import type { InsightsBreakdownResponse } from "~/api/types";
+import { useCurrency } from "./CurrencyContext";
 import { formatMoney } from "./format";
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function BreakdownChart({ title, data, isLoading, isError }: Props) {
+  const { currency } = useCurrency();
   return (
     <div className="bg-white border border-slate-200 rounded p-4">
       <h2 className="text-sm font-semibold text-slate-900 mb-3">{title}</h2>
@@ -44,7 +46,7 @@ export function BreakdownChart({ title, data, isLoading, isError }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
               <XAxis
                 type="number"
-                tickFormatter={(v) => formatMoney(Number(v))}
+                tickFormatter={(v) => formatMoney(Number(v), currency)}
                 stroke="#94a3b8"
                 fontSize={12}
               />
@@ -56,7 +58,7 @@ export function BreakdownChart({ title, data, isLoading, isError }: Props) {
                 width={90}
               />
               <Tooltip
-                formatter={(value) => formatMoney(Number(value))}
+                formatter={(value) => formatMoney(Number(value), currency)}
                 cursor={{ fill: "#f1f5f9" }}
               />
               <Bar dataKey="total" fill="#0f172a" radius={[0, 3, 3, 0]} />

@@ -7,6 +7,7 @@ import {
   YAxis,
 } from "recharts";
 import type { Granularity } from "~/api/types";
+import { useCurrency } from "./CurrencyContext";
 import { useItemTimeseries } from "./api";
 import { formatMoney, formatPeriodLabel } from "./format";
 
@@ -27,6 +28,7 @@ export function ItemDetailDrawer({
   granularity,
   onClose,
 }: Props) {
+  const { currency } = useCurrency();
   const { data, isLoading, isError } = useItemTimeseries(
     normalizedName,
     from,
@@ -70,7 +72,7 @@ export function ItemDetailDrawer({
                 <div className="bg-slate-50 rounded p-3">
                   <div className="text-xs text-slate-500 mb-1">Total spend</div>
                   <div className="text-lg font-semibold font-mono">
-                    {formatMoney(data.total_spend)}
+                    {formatMoney(data.total_spend, currency)}
                   </div>
                 </div>
                 <div className="bg-slate-50 rounded p-3">
@@ -81,7 +83,7 @@ export function ItemDetailDrawer({
                   <div className="bg-slate-50 rounded p-3">
                     <div className="text-xs text-slate-500 mb-1">Avg per purchase</div>
                     <div className="text-lg font-semibold font-mono">
-                      {formatMoney(data.total_spend / data.purchase_count)}
+                      {formatMoney(data.total_spend / data.purchase_count, currency)}
                     </div>
                   </div>
                 )}
@@ -110,13 +112,13 @@ export function ItemDetailDrawer({
                           fontSize={11}
                         />
                         <YAxis
-                          tickFormatter={(v) => formatMoney(Number(v))}
+                          tickFormatter={(v) => formatMoney(Number(v), currency)}
                           stroke="#94a3b8"
                           fontSize={11}
                           width={60}
                         />
                         <Tooltip
-                          formatter={(value) => formatMoney(Number(value))}
+                          formatter={(value) => formatMoney(Number(value), currency)}
                           labelFormatter={(label) => formatPeriodLabel(String(label), granularity)}
                           cursor={{ stroke: "#e2e8f0" }}
                         />
