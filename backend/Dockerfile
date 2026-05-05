@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project
 
+# bust-cache-v2
 COPY src ./src
 COPY alembic ./alembic
 COPY alembic.ini ./
