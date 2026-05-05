@@ -271,6 +271,15 @@ class BillService:
         await self._session.commit()
         return await self._get_owned_bill(bill_id=bill.id, user=user)
 
+    async def delete_bill(self, *, bill_id: uuid.UUID, user: User) -> None:
+        bill = await self._get_owned_bill(bill_id=bill_id, user=user)
+        image_path = bill.image_path
+        await self._session.delete(bill)
+        await self._session.commit()
+        if image_path:
+            with contextlib.suppress(Exception):
+                await self._storage.delete(image_path)
+
     async def finalize(self, *, bill_id: uuid.UUID, user: User) -> Bill:
         bill = await self._get_owned_bill(bill_id=bill_id, user=user)
         if bill.status == STATUS_REVIEWED:

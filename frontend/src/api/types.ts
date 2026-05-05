@@ -121,6 +121,11 @@ export interface SplitRequestResponse {
   bill: SplitRequestBillSummary;
 }
 
+export interface RecipientAssignment {
+  username: string;
+  bill_item_ids: string[];
+}
+
 export interface NonFriendInfo {
   username: string;
   amount: number;

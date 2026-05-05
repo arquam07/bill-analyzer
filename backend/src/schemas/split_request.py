@@ -1,13 +1,29 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+
+class RecipientAssignment(BaseModel):
+    username: str
+    bill_item_ids: list[uuid.UUID] = Field(min_length=1)
 
 
 class SplitRequestCreate(BaseModel):
-    usernames: list[str] = Field(min_length=1, max_length=10)
+    usernames: list[str] = Field(default=[], max_length=10)
     bill_item_ids: list[uuid.UUID] | None = Field(default=None)
     total_to_split: float | None = Field(default=None, gt=0)
+    assignments: list[RecipientAssignment] | None = Field(default=None, max_length=10)
+
+    @model_validator(mode="after")
+    def validate_mode(self) -> "SplitRequestCreate":
+        has_assignments = bool(self.assignments)
+        has_usernames = bool(self.usernames)
+        if not has_assignments and not has_usernames:
+            raise ValueError("either usernames or assignments must be provided")
+        if has_assignments and (self.bill_item_ids is not None or self.total_to_split is not None):
+            raise ValueError("assignments cannot be combined with bill_item_ids or total_to_split")
+        return self
 
 
 class BillSummary(BaseModel):

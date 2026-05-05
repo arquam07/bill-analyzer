@@ -112,3 +112,7 @@ class FriendRequestAlreadyExists(AppError):
 
 class AlreadyFriends(AppError):
     pass
+
+
+class AssignmentItemsInvalid(AppError):
+    """Item doesn't belong to the bill, has no price, or is assigned to multiple recipients."""

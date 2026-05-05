@@ -223,6 +223,19 @@ async def delete_item(
     return BillResponse.model_validate(bill)
 
 
+@router.delete("/{bill_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_bill(
+    bill_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    storage: StorageBackend = Depends(get_storage),
+) -> None:
+    try:
+        await _service(db, storage).delete_bill(bill_id=bill_id, user=user)
+    except BillNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "bill not found") from exc
+
+
 @router.post("/{bill_id}/finalize", response_model=BillResponse)
 async def finalize_bill(
     bill_id: uuid.UUID,

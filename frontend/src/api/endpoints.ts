@@ -18,6 +18,7 @@ import type {
   ItemOrderBy,
   ItemTimeseriesResponse,
   LoginRequest,
+  RecipientAssignment,
   RegisterRequest,
   SettlementResponse,
   SplitRequestListResponse,
@@ -67,6 +68,7 @@ export const bills = {
     }),
   deleteItem: (id: string, itemId: string) =>
     apiRequest<BillResponse>(`/bills/${id}/items/${itemId}`, { method: "DELETE" }),
+  delete: (id: string) => apiVoid(`/bills/${id}`, { method: "DELETE" }),
 };
 
 export const splitRequests = {
@@ -75,15 +77,13 @@ export const splitRequests = {
   create: (
     billId: string,
     usernames: string[],
-    options: { billItemIds?: string[]; totalToSplit?: number } = {},
+    options: { billItemIds?: string[]; totalToSplit?: number; assignments?: RecipientAssignment[] } = {},
   ) =>
     apiRequest<SplitRequestListResponse>(`/bills/${billId}/split-requests`, {
       method: "POST",
-      body: {
-        usernames,
-        bill_item_ids: options.billItemIds,
-        total_to_split: options.totalToSplit,
-      },
+      body: options.assignments
+        ? { usernames: [], assignments: options.assignments }
+        : { usernames, bill_item_ids: options.billItemIds, total_to_split: options.totalToSplit },
     }),
   listIncoming: () => apiRequest<SplitRequestListResponse>("/split-requests/incoming"),
   listOutgoing: () => apiRequest<SplitRequestListResponse>("/split-requests/outgoing"),

@@ -528,6 +528,7 @@ function BillDetail() {
   }, [authLoading, user, navigate]);
 
   const [showSplit, setShowSplit] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const billQuery = useQuery({
     queryKey: ["bills", billId],
@@ -570,6 +571,14 @@ function BillDetail() {
     mutationFn: (itemId: string) => billsApi.deleteItem(billId, itemId),
     onSuccess: setBill,
   });
+  const deleteBill = useMutation({
+    mutationFn: () => billsApi.delete(billId),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["bills"] });
+      await qc.invalidateQueries({ queryKey: ["insights"] });
+      void navigate({ to: "/dashboard" });
+    },
+  });
 
   if (authLoading || !user) return <p className="text-slate-500">Loading…</p>;
   if (billQuery.isLoading) return <p className="text-slate-500">Loading bill…</p>;
@@ -610,6 +619,13 @@ function BillDetail() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="border border-red-300 text-red-600 hover:bg-red-50 text-sm rounded-lg px-4 py-2.5 font-medium"
+          >
+            Delete bill
+          </button>
           {bill.total !== null && bill.total !== undefined && (
             <button
               type="button"
@@ -766,6 +782,46 @@ function BillDetail() {
             void qc.invalidateQueries({ queryKey: ["split-requests"] });
           }}
         />
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-slate-900">Delete this bill?</h2>
+            <p className="text-sm text-slate-600">
+              This will permanently delete{" "}
+              <span className="font-medium">
+                {bill.merchant ?? "this bill"}
+              </span>{" "}
+              and all its items. This action cannot be undone.
+            </p>
+            {deleteBill.error && (
+              <p className="text-sm text-red-600">
+                {deleteBill.error instanceof ApiError
+                  ? deleteBill.error.detail
+                  : "Something went wrong."}
+              </p>
+            )}
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleteBill.isPending}
+                className="px-4 py-2 text-sm rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteBill.mutate()}
+                disabled={deleteBill.isPending}
+                className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 font-medium"
+              >
+                {deleteBill.isPending ? "Deleting…" : "Yes, delete"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

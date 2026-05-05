@@ -5,6 +5,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.exceptions import (
+    AssignmentItemsInvalid,
     BillHasNoTotal,
     BillNotFound,
     SplitItemsInvalid,
@@ -28,6 +29,7 @@ from src.schemas.split_request import (
     BalancesResponse,
     BillSummary,
     NonFriendInfo,
+    RecipientAssignment,
     SettlementResponse,
     SplitRequestListResponse,
     SplitRequestResponse,
@@ -76,6 +78,30 @@ class SplitRequestService:
         return user
 
     async def create_split_requests(
+        self,
+        *,
+        bill_id: uuid.UUID,
+        from_user: User,
+        usernames: list[str],
+        bill_item_ids: list[uuid.UUID] | None,
+        total_to_split: float | None,
+        assignments: list[RecipientAssignment] | None = None,
+    ) -> SplitRequestListResponse:
+        if assignments:
+            return await self._create_from_assignments(
+                bill_id=bill_id,
+                from_user=from_user,
+                assignments=assignments,
+            )
+        return await self._create_equal_split(
+            bill_id=bill_id,
+            from_user=from_user,
+            usernames=usernames,
+            bill_item_ids=bill_item_ids,
+            total_to_split=total_to_split,
+        )
+
+    async def _create_equal_split(
         self,
         *,
         bill_id: uuid.UUID,
@@ -160,6 +186,86 @@ class SplitRequestService:
                 amount=sr_amount,
                 note=note,
                 item_shares=item_shares if item_shares else None,
+            )
+            created.append(sr)
+
+        await self._session.commit()
+        return SplitRequestListResponse(
+            items=[_sr_to_response(sr) for sr in created],
+            non_friends=non_friends,
+        )
+
+    async def _create_from_assignments(
+        self,
+        *,
+        bill_id: uuid.UUID,
+        from_user: User,
+        assignments: list[RecipientAssignment],
+    ) -> SplitRequestListResponse:
+        bill = await self._bills.get_with_items(bill_id)
+        if bill is None or bill.user_id != from_user.id:
+            raise BillNotFound(str(bill_id))
+
+        # Index bill items for O(1) lookup
+        bill_items_by_id = {it.id: it for it in bill.items}
+
+        # Validate no item assigned to more than one person
+        all_assigned: list[uuid.UUID] = [
+            iid for asgn in assignments for iid in asgn.bill_item_ids
+        ]
+        if len(all_assigned) != len(set(all_assigned)):
+            raise AssignmentItemsInvalid("an item is assigned to more than one recipient")
+
+        # Validate items and build per-person (item_shares, total) pairs
+        per_recipient: list[tuple[str, list[tuple[uuid.UUID, Decimal]], Decimal]] = []
+        for asgn in assignments:
+            item_shares: list[tuple[uuid.UUID, Decimal]] = []
+            total_amount = Decimal("0")
+            for iid in asgn.bill_item_ids:
+                item = bill_items_by_id.get(iid)
+                if item is None:
+                    raise AssignmentItemsInvalid(
+                        f"item {iid} does not belong to bill {bill_id}"
+                    )
+                if item.total_price is None:
+                    raise AssignmentItemsInvalid(f"item {iid} has no price")
+                price = item.total_price
+                item_shares.append((iid, price))
+                total_amount += price
+            per_recipient.append((asgn.username, item_shares, total_amount))
+
+        note = bill.merchant if bill.merchant else None
+        created: list[SplitRequest] = []
+        non_friends: list[NonFriendInfo] = []
+
+        for username, item_shares, sr_amount in per_recipient:
+            recipient = await self._users.get_by_username(username)
+            if recipient is None:
+                raise UserNotFound(username)
+            if recipient.id == from_user.id:
+                raise SplitWithSelf()
+
+            is_friend = await self._friends.are_friends(from_user.id, recipient.id)
+            if not is_friend:
+                non_friends.append(
+                    NonFriendInfo(
+                        username=username,
+                        amount=float(sr_amount),
+                        bill_item_ids=[iid for iid, _ in item_shares],
+                    )
+                )
+                continue
+
+            if await self._repo.pending_exists(bill_id, from_user.id, recipient.id):
+                raise SplitRequestAlreadyExists()
+
+            sr = await self._repo.create(
+                bill_id=bill_id,
+                from_user_id=from_user.id,
+                to_user_id=recipient.id,
+                amount=sr_amount,
+                note=note,
+                item_shares=item_shares,
             )
             created.append(sr)
 

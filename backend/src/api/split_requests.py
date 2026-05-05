@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_current_user, get_db
 from src.core.exceptions import (
+    AssignmentItemsInvalid,
     BillHasNoTotal,
     BillNotFound,
     SplitItemsInvalid,
@@ -65,6 +66,7 @@ async def create_split_requests(
             usernames=body.usernames,
             bill_item_ids=body.bill_item_ids,
             total_to_split=body.total_to_split,
+            assignments=body.assignments,
         )
     except BillNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "bill not found") from exc
@@ -73,6 +75,8 @@ async def create_split_requests(
             status.HTTP_422_UNPROCESSABLE_ENTITY, "bill has no total — extract it first"
         ) from exc
     except SplitItemsInvalid as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    except AssignmentItemsInvalid as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     except UserNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"user not found: {exc}") from exc
