@@ -39,10 +39,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.storage = storage
     app.state.vision_service = VisionService(
-        ollama_host=settings.ollama_host,
-        ollama_model=settings.ollama_model,
-        timeout_seconds=settings.ollama_timeout_seconds,
-        api_key=settings.ollama_api_key,
+        project=settings.vertex_project,
+        location=settings.vertex_location,
+        model=settings.vertex_model,
+        timeout_seconds=settings.vertex_timeout_seconds,
     )
     try:
         yield

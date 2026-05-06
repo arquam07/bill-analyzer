@@ -15,12 +15,12 @@ class Settings(BaseSettings):
     gcs_bucket: str | None = None
     # Comma-separated list of allowed CORS origins
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
-    ollama_host: str = "http://localhost:11434"
-    ollama_model: str = "glm-ocr"
-    ollama_timeout_seconds: float = 60.0
-    ollama_api_key: str | None = None
+    vertex_project: str = "bill-analyzer07"
+    vertex_location: str = "asia-northeast1"
+    vertex_model: str = "gemini-2.0-flash-001"
+    vertex_timeout_seconds: float = 60.0
 
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]
+    return Settings()
