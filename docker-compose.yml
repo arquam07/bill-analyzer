@@ -22,6 +22,7 @@ services:
       - ./backend/.env
     environment:
       DATABASE_URL: postgresql+asyncpg://bill:bill@postgres:5432/bill_analyzer
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcloud_adc.json
       LOG_LEVEL: INFO
       APP_ENV: dev
     extra_hosts:
@@ -36,6 +37,7 @@ services:
       - ./backend/src:/app/src
       - ./backend/alembic:/app/alembic
       - ./backend/storage:/app/storage
+      - ${APPDATA}/gcloud/application_default_credentials.json:/tmp/gcloud_adc.json:ro
 
 volumes:
   pgdata:
