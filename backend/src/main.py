@@ -17,6 +17,7 @@ from src.api.splits import router as splits_router
 from src.core.config import get_settings
 from src.core.logging import configure_logging
 from src.db.session import make_engine, make_sessionmaker
+from src.services.normalization_service import NormalizationService
 from src.services.storage.base import StorageBackend
 from src.services.storage.gcs import GcsBackend
 from src.services.storage.local import LocalDiskBackend
@@ -43,6 +44,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         location=settings.vertex_location,
         model=settings.vertex_model,
         timeout_seconds=settings.vertex_timeout_seconds,
+    )
+    app.state.normalization_service = NormalizationService(
+        project=settings.vertex_project,
+        location=settings.vertex_location,
+        model=settings.vertex_model,
+        timeout_seconds=30.0,
     )
     try:
         yield

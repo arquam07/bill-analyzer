@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.exceptions import InvalidSessionToken
 from src.models.user import User
 from src.services.auth_service import AuthService
+from src.services.normalization_service import NormalizationService
 from src.services.storage.base import StorageBackend
 from src.services.vision_service import VisionService
 
@@ -25,6 +26,10 @@ def get_storage(request: Request) -> StorageBackend:
 
 def get_vision_service(request: Request) -> VisionService:
     return request.app.state.vision_service  # type: ignore[no-any-return]
+
+
+def get_normalization_service(request: Request) -> NormalizationService:
+    return request.app.state.normalization_service  # type: ignore[no-any-return]
 
 
 async def get_current_user(

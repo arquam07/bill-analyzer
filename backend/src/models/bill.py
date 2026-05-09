@@ -77,6 +77,9 @@ class BillItem(Base):
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     total_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    normalized_name: Mapped[str | None] = mapped_column(
+        String(256), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

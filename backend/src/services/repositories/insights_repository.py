@@ -95,6 +95,7 @@ def _effective_items_subq(
         select(
             BillItem.id.label("bill_item_id"),
             BillItem.name.label("name"),
+            BillItem.normalized_name.label("normalized_name"),
             coalesced_category.label("category"),
             Bill.merchant.label("merchant"),
             Bill.billed_at.label("billed_at"),
@@ -115,6 +116,7 @@ def _effective_items_subq(
         select(
             SplitRequestItem.bill_item_id.label("bill_item_id"),
             BillItem.name.label("name"),
+            BillItem.normalized_name.label("normalized_name"),
             coalesced_category.label("category"),
             Bill.merchant.label("merchant"),
             Bill.billed_at.label("billed_at"),
@@ -354,8 +356,9 @@ class InsightsRepository:
         limit: int,
     ) -> list[tuple[str, str, float, int, date | None]]:
         ei = _effective_items_subq(user_id, range_from, range_to)
-        normalized = func.regexp_replace(
-            func.btrim(func.lower(ei.c.name)), r"\s+", " ", "g"
+        normalized = func.coalesce(
+            ei.c.normalized_name,
+            func.regexp_replace(func.btrim(func.lower(ei.c.name)), r"\s+", " ", "g"),
         ).label("normalized")
         display = func.min(ei.c.name).label("display")
         total = func.coalesce(func.sum(ei.c.amount), 0).label("total")
@@ -397,8 +400,9 @@ class InsightsRepository:
         granularity: str,
     ) -> tuple[float, int, list[tuple[date, float, int]]]:
         ei = _effective_items_subq(user_id, range_from, range_to)
-        normalized_expr = func.regexp_replace(
-            func.btrim(func.lower(ei.c.name)), r"\s+", " ", "g"
+        normalized_expr = func.coalesce(
+            ei.c.normalized_name,
+            func.regexp_replace(func.btrim(func.lower(ei.c.name)), r"\s+", " ", "g"),
         )
         period = func.date_trunc(granularity, cast(ei.c.billed_at, DateTime)).label("period")
 

@@ -1,9 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile, status
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.api.deps import get_current_user, get_db, get_storage, get_vision_service
+from src.api.deps import get_current_user, get_db, get_normalization_service, get_storage, get_vision_service
+from src.services.normalization_service import NormalizationService
 from src.core.constants import MAX_UPLOAD_BYTES
 from src.core.exceptions import (
     BillItemNotFound,
@@ -239,9 +240,12 @@ async def delete_bill(
 @router.post("/{bill_id}/finalize", response_model=BillResponse)
 async def finalize_bill(
     bill_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
+    norm_svc: NormalizationService = Depends(get_normalization_service),
 ) -> BillResponse:
     try:
         bill = await _service(db, storage).finalize(bill_id=bill_id, user=user)
@@ -256,4 +260,21 @@ async def finalize_bill(
             status.HTTP_409_CONFLICT,
             "bill must be extracted before it can be finalized",
         ) from exc
+    background_tasks.add_task(
+        _run_normalization,
+        norm_svc,
+        request.app.state.sessionmaker,
+        bill.id,
+        user.id,
+    )
     return BillResponse.model_validate(bill)
+
+
+async def _run_normalization(
+    norm_svc: NormalizationService,
+    sessionmaker: async_sessionmaker[AsyncSession],
+    bill_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> None:
+    async with sessionmaker() as session:
+        await norm_svc.normalize_bill(session, bill_id=bill_id, user_id=user_id)

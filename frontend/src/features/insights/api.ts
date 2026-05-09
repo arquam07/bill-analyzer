@@ -50,7 +50,7 @@ export function useBreakdown(
 ) {
   return useQuery({
     queryKey: ["insights", "breakdown", from, to, dimension],
-    queryFn: () => insightsApi.breakdown({ from, to, dimension, limit: 10 }),
+    queryFn: () => insightsApi.breakdown({ from, to, dimension, limit: 5 }),
     enabled,
   });
 }
@@ -63,7 +63,7 @@ export function useTopItems(
 ) {
   return useQuery({
     queryKey: ["insights", "items", from, to, order_by],
-    queryFn: () => insightsApi.topItems({ from, to, order_by, limit: 20 }),
+    queryFn: () => insightsApi.topItems({ from, to, order_by, limit: 5 }),
     enabled,
   });
 }
