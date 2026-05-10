@@ -11,6 +11,7 @@ class LineItem(BaseModel):
     unit_price: float | None = None
     total_price: float | None = None
     category: str | None = None
+    tax_rate: float | None = None
 
 
 class RawBillExtraction(BaseModel):

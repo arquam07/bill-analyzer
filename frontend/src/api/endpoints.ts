@@ -77,12 +77,12 @@ export const splitRequests = {
   create: (
     billId: string,
     usernames: string[],
-    options: { billItemIds?: string[]; totalToSplit?: number; assignments?: RecipientAssignment[] } = {},
+    options: { billItemIds?: string[]; totalToSplit?: number; assignments?: RecipientAssignment[]; ownerItemIds?: string[] } = {},
   ) =>
     apiRequest<SplitRequestListResponse>(`/bills/${billId}/split-requests`, {
       method: "POST",
       body: options.assignments
-        ? { usernames: [], assignments: options.assignments }
+        ? { usernames: [], assignments: options.assignments, owner_item_ids: options.ownerItemIds }
         : { usernames, bill_item_ids: options.billItemIds, total_to_split: options.totalToSplit },
     }),
   listIncoming: () => apiRequest<SplitRequestListResponse>("/split-requests/incoming"),

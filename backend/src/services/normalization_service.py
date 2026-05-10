@@ -25,8 +25,8 @@ Return null for uncategorizable items (barcodes, misc charges, etc.).
 
 Input JSON:
 {
-  "existing_canonicals": ["eggs", "milk", "bread"],
-  "new_items": ["fresh eggs", "halal chicken", "artisan bread"]
+  "existing_canonicals": ["eggs", "milk", "bread", "chicken rice"],
+  "new_items": ["fresh eggs", "low fat milk", "artisan bread", "spicy chicken chilli rice"]
 }
 
 Output JSON ONLY (no prose, no markdown, no code fences):
@@ -34,6 +34,7 @@ Output JSON ONLY (no prose, no markdown, no code fences):
   "fresh eggs": "eggs",
   "halal chicken": "chicken",
   "artisan bread": "bread"
+  "spicy chicken chilli rice": "chicken rice"
 }"""
 
 

@@ -86,12 +86,14 @@ class SplitRequestService:
         bill_item_ids: list[uuid.UUID] | None,
         total_to_split: float | None,
         assignments: list[RecipientAssignment] | None = None,
+        owner_item_ids: list[uuid.UUID] | None = None,
     ) -> SplitRequestListResponse:
         if assignments:
             return await self._create_from_assignments(
                 bill_id=bill_id,
                 from_user=from_user,
                 assignments=assignments,
+                owner_item_ids=owner_item_ids,
             )
         return await self._create_equal_split(
             bill_id=bill_id,
@@ -124,7 +126,9 @@ class SplitRequestService:
             for it in picked:
                 if it.total_price is None:
                     raise SplitItemsInvalid(f"item {it.id} has no price")
-                selected_priced.append((it.id, it.total_price))
+                tax = it.tax_rate or Decimal("0")
+                effective = it.total_price * (1 + tax)
+                selected_priced.append((it.id, effective))
 
         if selected_priced:
             split_base = sum((p for _, p in selected_priced), Decimal("0"))
@@ -177,7 +181,7 @@ class SplitRequestService:
                     )
                 )
                 continue
-            if await self._repo.pending_exists(bill_id, from_user.id, recipient.id):
+            if await self._repo.request_exists(bill_id, from_user.id, recipient.id):
                 raise SplitRequestAlreadyExists()
             sr = await self._repo.create(
                 bill_id=bill_id,
@@ -201,6 +205,7 @@ class SplitRequestService:
         bill_id: uuid.UUID,
         from_user: User,
         assignments: list[RecipientAssignment],
+        owner_item_ids: list[uuid.UUID] | None = None,
     ) -> SplitRequestListResponse:
         bill = await self._bills.get_with_items(bill_id)
         if bill is None or bill.user_id != from_user.id:
@@ -209,12 +214,13 @@ class SplitRequestService:
         # Index bill items for O(1) lookup
         bill_items_by_id = {it.id: it for it in bill.items}
 
-        # Validate no item assigned to more than one person
-        all_assigned: list[uuid.UUID] = [
-            iid for asgn in assignments for iid in asgn.bill_item_ids
-        ]
-        if len(all_assigned) != len(set(all_assigned)):
-            raise AssignmentItemsInvalid("an item is assigned to more than one recipient")
+        # Count how many people share each item (recipients + owner if they co-share)
+        sharer_count: dict[uuid.UUID, int] = defaultdict(int)
+        for asgn in assignments:
+            for iid in asgn.bill_item_ids:
+                sharer_count[iid] += 1
+        for iid in (owner_item_ids or []):
+            sharer_count[iid] += 1
 
         # Validate items and build per-person (item_shares, total) pairs
         per_recipient: list[tuple[str, list[tuple[uuid.UUID, Decimal]], Decimal]] = []
@@ -229,9 +235,13 @@ class SplitRequestService:
                     )
                 if item.total_price is None:
                     raise AssignmentItemsInvalid(f"item {iid} has no price")
-                price = item.total_price
-                item_shares.append((iid, price))
-                total_amount += price
+                tax = item.tax_rate or Decimal("0")
+                effective_price = item.total_price * (1 + tax)
+                share = (effective_price / Decimal(sharer_count[iid])).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                item_shares.append((iid, share))
+                total_amount += share
             per_recipient.append((asgn.username, item_shares, total_amount))
 
         note = bill.merchant if bill.merchant else None
@@ -256,7 +266,7 @@ class SplitRequestService:
                 )
                 continue
 
-            if await self._repo.pending_exists(bill_id, from_user.id, recipient.id):
+            if await self._repo.request_exists(bill_id, from_user.id, recipient.id):
                 raise SplitRequestAlreadyExists()
 
             sr = await self._repo.create(

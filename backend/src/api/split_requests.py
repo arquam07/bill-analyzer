@@ -67,6 +67,7 @@ async def create_split_requests(
             bill_item_ids=body.bill_item_ids,
             total_to_split=body.total_to_split,
             assignments=body.assignments,
+            owner_item_ids=body.owner_item_ids,
         )
     except BillNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "bill not found") from exc

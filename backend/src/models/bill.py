@@ -76,6 +76,7 @@ class BillItem(Base):
     quantity: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     total_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    tax_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 4), nullable=True)
     category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     normalized_name: Mapped[str | None] = mapped_column(
         String(256), nullable=True, index=True

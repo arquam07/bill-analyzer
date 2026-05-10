@@ -49,6 +49,10 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
 
   const itemsWithPrice = items.filter((it) => it.total_price !== null && it.total_price !== undefined);
 
+  function effectivePrice(it: BillItemResponse): number {
+    return (it.total_price ?? 0) * (1 + (it.tax_rate ?? 0));
+  }
+
   // --- Equal mode state ---
   const [checkedIds, setCheckedIds] = useState<Set<string>>(
     () => new Set(itemsWithPrice.map((it) => it.id)),
@@ -56,7 +60,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
   const allChecked = checkedIds.size === itemsWithPrice.length;
   const selectedTotal = itemsWithPrice
     .filter((it) => checkedIds.has(it.id))
-    .reduce((s, it) => s + (it.total_price ?? 0), 0);
+    .reduce((s, it) => s + effectivePrice(it), 0);
   const splitBase = itemsWithPrice.length > 0 ? selectedTotal : total;
   const n = users.length + 1;
   const share = users.length === 0 ? splitBase : Math.round((splitBase / n) * 100) / 100;
@@ -75,40 +79,50 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
     });
   }
 
+  // assign mode: "me" (the bill owner) — pre-checked for every item
+  const [myAssignments, setMyAssignments] = useState<Set<string>>(
+    () => new Set(itemsWithPrice.map((it) => it.id)),
+  );
+
   // --- Assign mode helpers ---
-  function toggleAssignment(username: string, itemId: string) {
-    setAssignments((prev) => {
-      const next = { ...prev };
-      // Remove from any other person first (exclusive assignment)
-      for (const other of Object.keys(next)) {
-        if (other !== username) {
-          const s = new Set(next[other]);
-          s.delete(itemId);
-          next[other] = s;
-        }
-      }
-      // Toggle for this person
-      const s = new Set(next[username] ?? []);
-      if (s.has(itemId)) s.delete(itemId);
-      else s.add(itemId);
-      next[username] = s;
+  function toggleMyItem(itemId: string) {
+    setMyAssignments((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
       return next;
     });
+  }
+
+  function toggleAssignment(username: string, itemId: string) {
+    setAssignments((prev) => {
+      const s = new Set(prev[username] ?? []);
+      if (s.has(itemId)) s.delete(itemId);
+      else s.add(itemId);
+      return { ...prev, [username]: s };
+    });
+  }
+
+  function getSharerCount(itemId: string): number {
+    const recipientCount = users.filter((u) => assignments[u.username]?.has(itemId)).length;
+    return recipientCount + (myAssignments.has(itemId) ? 1 : 0);
   }
 
   function getPersonTotal(username: string): number {
     return itemsWithPrice
       .filter((it) => assignments[username]?.has(it.id))
-      .reduce((s, it) => s + (it.total_price ?? 0), 0);
+      .reduce((s, it) => {
+        const sharers = Math.max(getSharerCount(it.id), 1);
+        return s + effectivePrice(it) / sharers;
+      }, 0);
   }
 
-  function getAssignedToOthers(username: string): Set<string> {
-    const s = new Set<string>();
-    for (const [u, ids] of Object.entries(assignments)) {
-      if (u !== username) ids.forEach((id) => s.add(id));
-    }
-    return s;
-  }
+  const myTotal = itemsWithPrice
+    .filter((it) => myAssignments.has(it.id))
+    .reduce((s, it) => {
+      const sharers = Math.max(getSharerCount(it.id), 1);
+      return s + effectivePrice(it) / sharers;
+    }, 0);
 
   // --- User management ---
   function selectFriend(f: { user_id: string; username: string; name: string | null }) {
@@ -184,7 +198,10 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
           username: u.username,
           bill_item_ids: Array.from(assignments[u.username] ?? new Set<string>()),
         }));
-        return api.create(billId, [], { assignments: assignmentsList });
+        return api.create(billId, [], {
+          assignments: assignmentsList,
+          ownerItemIds: Array.from(myAssignments),
+        });
       }
       const usernames = users.map((u) => u.username);
       if (itemsWithPrice.length > 0) {
@@ -355,7 +372,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
         {/* Username input with friends dropdown */}
         <div className="space-y-1">
           <label className="block text-sm font-medium text-slate-700">
-            {mode === "assign" ? "Add people, then assign their items below" : "Add people to split with"}
+            Add people to split with
           </label>
           <div className="relative">
             <div className="flex gap-2">
@@ -435,71 +452,66 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
           </ul>
         )}
 
-        {/* Assign mode: per-person item cards */}
+        {/* Assign mode: card-per-item with pill toggles — works on all screen sizes */}
         {mode === "assign" && users.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <p className="text-sm font-medium text-slate-700">Assign items to each person</p>
-            {users.map((u) => {
-              const assignedToOthers = getAssignedToOthers(u.username);
-              const personTotal = getPersonTotal(u.username);
-              return (
-                <div key={u.id} className="border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 bg-slate-50">
-                    <span className="text-sm font-medium">
-                      @{u.username}
-                      {u.name && <span className="ml-1.5 text-slate-400 font-normal text-xs">{u.name}</span>}
-                      {friendsList.some((f) => f.user_id === u.id) && (
-                        <span className="ml-1.5 text-xs text-emerald-600">friend</span>
-                      )}
-                    </span>
-                    <div className="flex items-center gap-3">
-                      <span className={`font-mono text-sm ${personTotal > 0 ? "text-slate-700 font-medium" : "text-slate-400"}`}>
-                        {personTotal > 0 ? personTotal.toFixed(2) : "—"}
+            <ul className="space-y-2">
+              {itemsWithPrice.map((item) => {
+                const sharers = getSharerCount(item.id);
+                const effPrice = effectivePrice(item);
+                const perShare = sharers > 1
+                  ? (effPrice / sharers).toFixed(2)
+                  : null;
+                return (
+                  <li key={item.id} className="border border-slate-200 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm text-slate-800 font-medium">{item.name}</span>
+                      <span className="font-mono text-xs text-slate-500 whitespace-nowrap shrink-0">
+                        {effPrice.toFixed(2)}
+                        {item.tax_rate != null && (
+                          <span className="ml-1 text-slate-400 font-sans">
+                            incl. {(item.tax_rate * 100).toFixed(0)}% tax
+                          </span>
+                        )}
+                        {perShare && (
+                          <span className="ml-1 text-slate-400">÷{sharers} = {perShare} ea</span>
+                        )}
                       </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {/* Me pill */}
                       <button
                         type="button"
-                        onClick={() => removeUser(u.username)}
-                        className="text-slate-400 hover:text-red-600 text-base"
-                        aria-label={`Remove ${u.username}`}
+                        onClick={() => toggleMyItem(item.id)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                          myAssignments.has(item.id)
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white text-slate-500 border-slate-300"
+                        }`}
                       >
-                        ×
+                        Me
                       </button>
+                      {/* Recipient pills */}
+                      {users.map((u) => (
+                        <button
+                          key={u.username}
+                          type="button"
+                          onClick={() => toggleAssignment(u.username, item.id)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                            assignments[u.username]?.has(item.id)
+                              ? "bg-slate-900 text-white border-slate-900"
+                              : "bg-white text-slate-500 border-slate-300"
+                          }`}
+                        >
+                          @{u.username}
+                        </button>
+                      ))}
                     </div>
-                  </div>
-                  <ul className="divide-y divide-slate-100 max-h-44 overflow-y-auto">
-                    {itemsWithPrice.map((item) => {
-                      const isChecked = assignments[u.username]?.has(item.id) ?? false;
-                      const isDisabled = assignedToOthers.has(item.id);
-                      return (
-                        <li key={item.id} className="flex items-center gap-2 px-3 py-2 text-sm">
-                          <input
-                            type="checkbox"
-                            id={`assign-${u.username}-${item.id}`}
-                            checked={isChecked}
-                            disabled={isDisabled}
-                            onChange={() => toggleAssignment(u.username, item.id)}
-                            className="shrink-0"
-                          />
-                          <label
-                            htmlFor={`assign-${u.username}-${item.id}`}
-                            className={`flex-1 ${
-                              isDisabled
-                                ? "text-slate-400 line-through cursor-not-allowed"
-                                : "text-slate-800 cursor-pointer"
-                            }`}
-                          >
-                            {item.name}
-                          </label>
-                          <span className={`font-mono text-xs ${isDisabled ? "text-slate-300" : "text-slate-500"}`}>
-                            {(item.total_price ?? 0).toFixed(2)}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              );
-            })}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
 
@@ -529,6 +541,10 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
 
         {mode === "assign" && users.length > 0 && (
           <div className="rounded bg-slate-50 border border-slate-200 px-4 py-3 text-sm space-y-1.5">
+            <div className="flex justify-between text-emerald-700 font-medium">
+              <span>You (me)</span>
+              <span className="font-mono">{myTotal > 0 ? myTotal.toFixed(2) : "nothing"}</span>
+            </div>
             {users.map((u) => {
               const amt = getPersonTotal(u.username);
               return (
@@ -540,23 +556,6 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
                 </div>
               );
             })}
-            {/* Unassigned items = your portion */}
-            {(() => {
-              const allAssignedIds = new Set(
-                Object.values(assignments).flatMap((s) => Array.from(s)),
-              );
-              const yourTotal = itemsWithPrice
-                .filter((it) => !allAssignedIds.has(it.id))
-                .reduce((s, it) => s + (it.total_price ?? 0), 0);
-              return (
-                <div className="flex justify-between text-emerald-700 font-medium border-t border-slate-200 pt-1 mt-1">
-                  <span>Your portion</span>
-                  <span className="font-mono">
-                    {yourTotal > 0 ? yourTotal.toFixed(2) : "nothing"}
-                  </span>
-                </div>
-              );
-            })()}
           </div>
         )}
 

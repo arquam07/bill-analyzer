@@ -34,6 +34,7 @@ Extract structured data from the image and return ONLY valid JSON with this shap
       "quantity": number | null,
       "unit_price": number | null,
       "total_price": number | null,
+      "tax_rate": number | null,        // decimal rate e.g. 0.08 or 0.10; null if unknown
       "category": string | null         // one of: {_CATEGORY_LIST}
     }}
   ],
@@ -44,7 +45,10 @@ Rules:
 - Use null for fields you cannot read confidently.
 - Numeric fields must be numbers, not strings.
 - Translate "merchant" and item "name" fields into {lang_name} when the receipt is in another language. "raw_text" stays in the original language exactly as printed.
-- "category" describes the bill as a whole (e.g. a supermarket = grocery, a restaurant = food). Each item may also have its own category for finer breakdowns. Use null if uncertain."""
+- "category" describes the bill as a whole (e.g. a supermarket = grocery, a restaurant = food). Each item may also have its own category for finer breakdowns. Use null if uncertain.
+- Japanese receipts use 外税 (exclusive/pre-tax pricing): item prices are pre-tax. Items marked with ※ carry 8% reduced tax (食料品, tax_rate=0.08); items WITHOUT ※ carry 10% standard tax (tax_rate=0.10). If the ※ mark cannot be determined, default to tax_rate=0.08.
+- If the receipt shows no tax section or tax rates at all, prices are already tax-inclusive — set tax_rate=null for all items.
+- For non-Japanese receipts: extract tax_rate per item if the receipt clearly shows per-item tax rates, otherwise null."""
 
 
 class VisionService:

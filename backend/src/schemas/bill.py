@@ -16,6 +16,7 @@ class BillItemResponse(BaseModel):
     quantity: float | None = None
     unit_price: float | None = None
     total_price: float | None = None
+    tax_rate: float | None = None
     category: str | None = None
 
 
@@ -94,6 +95,7 @@ class BillItemCreateRequest(BaseModel):
     quantity: float | None = None
     unit_price: float | None = None
     total_price: float | None = None
+    tax_rate: float | None = Field(default=None, ge=0, le=1)
     category: str | None = Field(default=None, max_length=64)
 
 
@@ -102,4 +104,5 @@ class BillItemUpdateRequest(BaseModel):
     quantity: float | None = None
     unit_price: float | None = None
     total_price: float | None = None
+    tax_rate: float | None = Field(default=None, ge=0, le=1)
     category: str | None = Field(default=None, max_length=64)

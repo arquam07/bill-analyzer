@@ -69,7 +69,7 @@ class SplitRequestRepository:
         )
         return result.scalar_one_or_none()
 
-    async def pending_exists(
+    async def request_exists(
         self, bill_id: uuid.UUID, from_user_id: uuid.UUID, to_user_id: uuid.UUID
     ) -> bool:
         result = await self._session.execute(
@@ -77,7 +77,6 @@ class SplitRequestRepository:
                 SplitRequest.bill_id == bill_id,
                 SplitRequest.from_user_id == from_user_id,
                 SplitRequest.to_user_id == to_user_id,
-                SplitRequest.status == STATUS_PENDING,
             )
         )
         return result.scalar_one_or_none() is not None

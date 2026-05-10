@@ -23,6 +23,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://bill:bill@postgres:5432/bill_analyzer
       GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcloud_adc.json
+      GOOGLE_CLOUD_PROJECT: bill-analyzer07
       LOG_LEVEL: INFO
       APP_ENV: dev
     extra_hosts:

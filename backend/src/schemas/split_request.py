@@ -14,6 +14,7 @@ class SplitRequestCreate(BaseModel):
     bill_item_ids: list[uuid.UUID] | None = Field(default=None)
     total_to_split: float | None = Field(default=None, gt=0)
     assignments: list[RecipientAssignment] | None = Field(default=None, max_length=10)
+    owner_item_ids: list[uuid.UUID] | None = Field(default=None)
 
     @model_validator(mode="after")
     def validate_mode(self) -> "SplitRequestCreate":

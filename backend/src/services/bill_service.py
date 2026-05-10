@@ -172,6 +172,7 @@ class BillService:
                     quantity=_to_decimal(item.quantity),
                     unit_price=_to_decimal(item.unit_price),
                     total_price=_to_decimal(item.total_price),
+                    tax_rate=_to_decimal(item.tax_rate),
                     category=item.category,
                 )
             )
@@ -216,6 +217,7 @@ class BillService:
                 quantity=_to_decimal(item.quantity),
                 unit_price=_to_decimal(item.unit_price),
                 total_price=_to_decimal(item.total_price),
+                tax_rate=_to_decimal(item.tax_rate),
                 category=item.category,
             )
         )
@@ -248,6 +250,8 @@ class BillService:
             item.unit_price = _to_decimal(data["unit_price"])
         if "total_price" in data:
             item.total_price = _to_decimal(data["total_price"])
+        if "tax_rate" in data:
+            item.tax_rate = _to_decimal(data["tax_rate"])
         if "category" in data:
             item.category = data["category"]
 
