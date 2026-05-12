@@ -9,6 +9,8 @@ from src.core.constants import BILL_CATEGORIES, DEFAULT_LANGUAGE
 from src.core.exceptions import OllamaUnavailable, VLMResponseInvalid
 from src.schemas.extraction import RawBillExtraction
 
+_MAX_RETRIES = 3
+
 _LANGUAGE_NAMES = {"en": "English", "ja": "Japanese"}
 
 _CATEGORY_LIST = ", ".join(BILL_CATEGORIES)
@@ -81,34 +83,44 @@ class VisionService:
             types.Part.from_bytes(data=image_bytes, mime_type=mime),
             types.Part(text="Extract all data from this bill or receipt."),
         ]
-        try:
-            response = await asyncio.wait_for(
-                self._client.aio.models.generate_content(
-                    model=self._model,
-                    contents=contents,  # type: ignore[arg-type]
-                    config=config,
-                ),
-                timeout=self._timeout,
-            )
-        except asyncio.TimeoutError as exc:
-            raise OllamaUnavailable(
-                f"Vertex AI request timed out after {self._timeout}s"
-            ) from exc
-        except Exception as exc:
-            raise OllamaUnavailable(f"Vertex AI error: {exc}") from exc
 
-        raw = response.text or ""
-        try:
-            data = json.loads(raw)
-            return RawBillExtraction.model_validate(data)
-        except (json.JSONDecodeError, TypeError) as exc:
-            raise VLMResponseInvalid(
-                f"Vertex AI output is not valid JSON: {raw[:500]}"
-            ) from exc
-        except ValidationError as exc:
-            raise VLMResponseInvalid(
-                f"Vertex AI output failed schema validation: {exc.errors()[:5]}"
-            ) from exc
+        last_exc: Exception = VLMResponseInvalid("extraction did not run")
+        for attempt in range(_MAX_RETRIES):
+            if attempt > 0:
+                await asyncio.sleep(1)
+
+            try:
+                response = await asyncio.wait_for(
+                    self._client.aio.models.generate_content(
+                        model=self._model,
+                        contents=contents,  # type: ignore[arg-type]
+                        config=config,
+                    ),
+                    timeout=self._timeout,
+                )
+            except asyncio.TimeoutError as exc:
+                # Timeout is too expensive to retry — fail immediately.
+                raise OllamaUnavailable(
+                    f"Vertex AI request timed out after {self._timeout}s"
+                ) from exc
+            except Exception as exc:
+                last_exc = OllamaUnavailable(f"Vertex AI error: {exc}")
+                continue
+
+            raw = response.text or ""
+            try:
+                data = json.loads(raw)
+                return RawBillExtraction.model_validate(data)
+            except (json.JSONDecodeError, TypeError) as exc:
+                last_exc = VLMResponseInvalid(
+                    f"Vertex AI output is not valid JSON (attempt {attempt + 1}): {raw[:500]}"
+                )
+            except ValidationError as exc:
+                last_exc = VLMResponseInvalid(
+                    f"Vertex AI output failed schema validation (attempt {attempt + 1}): {exc.errors()[:5]}"
+                )
+
+        raise last_exc
 
     async def aclose(self) -> None:
         pass  # google-genai client has no persistent connection to close
