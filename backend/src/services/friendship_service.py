@@ -97,7 +97,7 @@ class FriendshipService:
 
         # Promote any deferred split requests to real split requests
         for ds in fr.deferred_splits:
-            already = await self._sr_repo.pending_exists(ds.bill_id, ds.from_user_id, ds.to_user_id)
+            already = await self._sr_repo.request_exists(ds.bill_id, ds.from_user_id, ds.to_user_id)
             if not already:
                 await self._sr_repo.create(
                     bill_id=ds.bill_id,
