@@ -94,6 +94,10 @@ function ExtractionButton({
   );
 }
 
+function effectivePrice(it: BillItemResponse): number {
+  return (it.total_price ?? 0) * (1 + (it.tax_rate ?? 0));
+}
+
 function asNumber(s: string): number | null {
   if (s.trim() === "") return null;
   const n = Number(s);
@@ -311,6 +315,16 @@ function ItemRow({
           className="w-full px-2 py-1 border border-transparent hover:border-slate-300 rounded text-right disabled:bg-transparent"
         />
       </td>
+      <td className="px-2 py-1 w-36 text-right whitespace-nowrap">
+        {item.total_price != null && item.tax_rate != null && (
+          <span className="text-xs font-mono text-slate-700">
+            {effectivePrice(item).toFixed(2)}
+            <span className="ml-1 text-slate-400 font-sans">
+              incl. {(item.tax_rate * 100).toFixed(0)}% tax
+            </span>
+          </span>
+        )}
+      </td>
       <td className="px-2 py-1 w-28">
         <input
           type="text"
@@ -370,7 +384,7 @@ function AddItemRow({ onAdd }: { onAdd: (body: BillItemCreateRequest) => void })
           className="w-full px-2 py-1 border border-slate-300 rounded text-right"
         />
       </td>
-      <td colSpan={2} className="px-2 py-1">
+      <td colSpan={3} className="px-2 py-1">
         <button
           type="button"
           onClick={submit}
@@ -469,6 +483,17 @@ function ItemCard({
           className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-800 disabled:bg-transparent"
         />
       </label>
+      {item.total_price != null && item.tax_rate != null && (
+        <div className="flex items-center justify-between text-xs border-t border-slate-100 pt-1.5">
+          <span className="text-slate-500">After tax</span>
+          <span className="font-mono text-slate-800">
+            {effectivePrice(item).toFixed(2)}
+            <span className="ml-1 text-slate-400 font-sans">
+              incl. {(item.tax_rate * 100).toFixed(0)}% tax
+            </span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -707,6 +732,7 @@ function BillDetail() {
                     <th className="px-2 py-1 font-medium text-right">Qty</th>
                     <th className="px-2 py-1 font-medium text-right">Unit</th>
                     <th className="px-2 py-1 font-medium text-right">Total</th>
+                    <th className="px-2 py-1 font-medium text-right">After tax</th>
                     <th className="px-2 py-1 font-medium">Category</th>
                     <th className="px-2 py-1"></th>
                   </tr>

@@ -360,8 +360,13 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
                   <label htmlFor={`item-${item.id}`} className="flex-1 cursor-pointer text-slate-800">
                     {item.name}
                   </label>
-                  <span className="font-mono text-slate-500 text-xs">
-                    {(item.total_price ?? 0).toFixed(2)}
+                  <span className="font-mono text-slate-500 text-xs whitespace-nowrap text-right shrink-0">
+                    {effectivePrice(item).toFixed(2)}
+                    {item.tax_rate != null && (
+                      <span className="ml-1 text-slate-400 font-sans">
+                        incl. {(item.tax_rate * 100).toFixed(0)}% tax
+                      </span>
+                    )}
                   </span>
                 </li>
               ))}
