@@ -646,11 +646,16 @@ function BillDetail() {
 
   const lastError =
     patchBill.error ??
-    extract.error ??
     finalize.error ??
     addItem.error ??
     updateItem.error ??
     deleteItem.error;
+
+  const extractionErrorMsg = extract.error
+    ? extract.error instanceof ApiError && extract.error.status >= 500
+      ? "Unable to fetch details, please re-upload the bill."
+      : "Extraction failed. Please try again."
+    : null;
 
   return (
     <div className="space-y-4">
@@ -721,6 +726,11 @@ function BillDetail() {
         </div>
       )}
 
+      {extractionErrorMsg && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {extractionErrorMsg}
+        </div>
+      )}
       {lastError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {lastError instanceof ApiError ? lastError.detail : "Something went wrong."}

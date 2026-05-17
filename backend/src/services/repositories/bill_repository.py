@@ -50,7 +50,7 @@ class BillRepository:
         stmt = (
             select(Bill)
             .where(Bill.user_id == user_id)
-            .order_by(Bill.created_at.desc())
+            .order_by(Bill.billed_at.desc().nullslast(), Bill.created_at.desc())
             .limit(limit)
             .offset(offset)
         )

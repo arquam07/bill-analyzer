@@ -53,7 +53,13 @@ export function BillsList() {
                 {b.merchant ?? <span className="text-slate-400">(unnamed)</span>}
               </div>
               <div className="text-xs text-slate-500">
-                {new Date(b.created_at).toLocaleString()}
+                {b.billed_at
+                  ? new Date(b.billed_at + "T12:00:00").toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : "—"}
               </div>
             </div>
             <div className="flex items-center gap-3">
