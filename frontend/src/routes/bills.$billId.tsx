@@ -22,6 +22,9 @@ const EXTRACTION_MESSAGES = [
   "Almost there…",
 ];
 
+const MSG_INTERVAL_MS = 5_000;
+const LONG_WAIT_MS = 30_000;
+
 function ExtractionButton({
   isPending,
   label,
@@ -35,24 +38,30 @@ function ExtractionButton({
   onClick: () => void;
   className: string;
 }) {
-  const [msgIdx, setMsgIdx] = useState(0);
+  const startRef = useRef<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     if (isPending) {
-      setMsgIdx(0);
-      intervalRef.current = setInterval(
-        () => setMsgIdx((i) => (i + 1) % EXTRACTION_MESSAGES.length),
-        10_000,
-      );
+      startRef.current = Date.now();
+      setTick(0);
+      intervalRef.current = setInterval(() => setTick((t) => t + 1), 1_000);
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      setMsgIdx(0);
+      startRef.current = null;
+      setTick(0);
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [isPending]);
+
+  const elapsed = startRef.current != null ? Date.now() - startRef.current : 0;
+  const pendingLabel =
+    elapsed >= LONG_WAIT_MS
+      ? "Taking longer than usual, please wait…"
+      : EXTRACTION_MESSAGES[Math.floor(elapsed / MSG_INTERVAL_MS) % EXTRACTION_MESSAGES.length];
 
   return (
     <button
@@ -83,7 +92,7 @@ function ExtractionButton({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
             />
           </svg>
-          {EXTRACTION_MESSAGES[msgIdx]}
+          {pendingLabel}
         </span>
       ) : reextract ? (
         "Re-extract"
@@ -604,6 +613,20 @@ function BillDetail() {
       void navigate({ to: "/dashboard" });
     },
   });
+
+  // Auto-trigger extraction when a freshly uploaded bill lands on this page.
+  const didAutoExtractRef = useRef(false);
+  const { mutate: triggerExtract } = extract;
+  useEffect(() => {
+    if (
+      billQuery.data?.status === "uploaded" &&
+      Boolean(billQuery.data?.image_path) &&
+      !didAutoExtractRef.current
+    ) {
+      didAutoExtractRef.current = true;
+      triggerExtract();
+    }
+  }, [billQuery.data?.status, billQuery.data?.image_path, triggerExtract]);
 
   if (authLoading || !user) return <p className="text-slate-500">Loading…</p>;
   if (billQuery.isLoading) return <p className="text-slate-500">Loading bill…</p>;

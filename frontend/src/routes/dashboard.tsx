@@ -57,6 +57,7 @@ function AddBillMenu() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -66,6 +67,17 @@ function AddBillMenu() {
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => billsApi.upload(file),
+    onSuccess: async (bill) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["bills"] }),
+        qc.invalidateQueries({ queryKey: ["insights"] }),
+      ]);
+      void navigate({ to: "/bills/$billId", params: { billId: bill.id } });
+    },
+  });
 
   const createManual = useMutation({
     mutationFn: () => billsApi.createManual(),
@@ -79,24 +91,47 @@ function AddBillMenu() {
     },
   });
 
+  const busy = uploadMutation.isPending || createManual.isPending;
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    uploadMutation.mutate(file);
+  }
+
   return (
     <div className="relative" ref={wrapRef}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png"
+        onChange={handleFileChange}
+        className="sr-only"
+      />
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        disabled={createManual.isPending}
+        disabled={busy}
         className="bg-slate-900 text-white text-sm rounded px-3 py-2 hover:bg-slate-800 disabled:opacity-60"
       >
-        {createManual.isPending ? "Creating…" : "Add bill"}
+        {uploadMutation.isPending ? "Uploading…" : createManual.isPending ? "Creating…" : "Add bill"}
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-52 rounded border border-slate-200 bg-white shadow-lg z-10">
+          <button
+            type="button"
+            onClick={() => { setOpen(false); fileInputRef.current?.click(); }}
+            className="block w-full text-left px-4 py-2 text-sm text-slate-800 hover:bg-slate-50"
+          >
+            Browse files
+          </button>
           <Link
             to="/upload"
             onClick={() => setOpen(false)}
-            className="block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50"
+            className="block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50 border-t border-slate-100"
           >
-            Upload bill photo
+            Take a photo
           </Link>
           <button
             type="button"
@@ -105,11 +140,11 @@ function AddBillMenu() {
           >
             Add bill manually
           </button>
-          {createManual.error && (
+          {(uploadMutation.error || createManual.error) && (
             <p className="px-4 py-2 text-xs text-red-600 border-t border-slate-100">
-              {createManual.error instanceof ApiError
-                ? createManual.error.detail
-                : "Failed to create bill."}
+              {(uploadMutation.error ?? createManual.error) instanceof ApiError
+                ? ((uploadMutation.error ?? createManual.error) as ApiError).detail
+                : "Something went wrong."}
             </p>
           )}
         </div>
