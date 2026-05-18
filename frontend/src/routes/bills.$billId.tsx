@@ -103,10 +103,6 @@ function ExtractionButton({
   );
 }
 
-function effectivePrice(it: BillItemResponse): number {
-  return (it.total_price ?? 0) * (1 + (it.tax_rate ?? 0));
-}
-
 function asNumber(s: string): number | null {
   if (s.trim() === "") return null;
   const n = Number(s);
@@ -233,6 +229,11 @@ function BillFields({
   );
 }
 
+function taxRateToDisplay(rate: number | null | undefined): string {
+  if (rate == null) return "";
+  return String(parseFloat((rate * 100).toFixed(4)));
+}
+
 function useItemEditor(
   item: BillItemResponse,
   onUpdate: (patch: BillItemUpdateRequest) => void,
@@ -242,6 +243,7 @@ function useItemEditor(
   const [unit, setUnit] = useState(item.unit_price !== null && item.unit_price !== undefined ? String(item.unit_price) : "");
   const [total, setTotal] = useState(item.total_price !== null && item.total_price !== undefined ? String(item.total_price) : "");
   const [category, setCategory] = useState(item.category ?? "");
+  const [taxRate, setTaxRate] = useState(taxRateToDisplay(item.tax_rate));
 
   useEffect(() => {
     setName(item.name);
@@ -249,6 +251,7 @@ function useItemEditor(
     setUnit(item.unit_price !== null && item.unit_price !== undefined ? String(item.unit_price) : "");
     setTotal(item.total_price !== null && item.total_price !== undefined ? String(item.total_price) : "");
     setCategory(item.category ?? "");
+    setTaxRate(taxRateToDisplay(item.tax_rate));
   }, [item]);
 
   const commitName = () => name !== item.name && onUpdate({ name });
@@ -256,6 +259,11 @@ function useItemEditor(
   const commitUnit = () => { const v = asNumber(unit); if (v !== (item.unit_price ?? null)) onUpdate({ unit_price: v }); };
   const commitTotal = () => { const v = asNumber(total); if (v !== (item.total_price ?? null)) onUpdate({ total_price: v }); };
   const commitCategory = () => category !== (item.category ?? "") && onUpdate({ category: category || null });
+  const commitTaxRate = () => {
+    const pct = asNumber(taxRate);
+    const decimal = pct !== null ? pct / 100 : null;
+    if (decimal !== (item.tax_rate ?? null)) onUpdate({ tax_rate: decimal });
+  };
 
   return {
     name, setName, commitName,
@@ -263,6 +271,7 @@ function useItemEditor(
     unit, setUnit, commitUnit,
     total, setTotal, commitTotal,
     category, setCategory, commitCategory,
+    taxRate, setTaxRate, commitTaxRate,
   };
 }
 
@@ -324,15 +333,32 @@ function ItemRow({
           className="w-full px-2 py-1 border border-transparent hover:border-slate-300 rounded text-right disabled:bg-transparent"
         />
       </td>
-      <td className="px-2 py-1 w-36 text-right whitespace-nowrap">
-        {item.total_price != null && item.tax_rate != null && (
-          <span className="text-xs font-mono text-slate-700">
-            {effectivePrice(item).toFixed(2)}
-            <span className="ml-1 text-slate-400 font-sans">
-              incl. {(item.tax_rate * 100).toFixed(0)}% tax
-            </span>
-          </span>
-        )}
+      <td className="px-2 py-1 w-40 text-right whitespace-nowrap">
+        {item.tax_rate != null && item.total_price != null && (() => {
+          const pct = asNumber(ed.taxRate);
+          const live = pct !== null ? item.total_price * (1 + pct / 100) : null;
+          return (
+            <div className="flex flex-col items-end gap-0.5">
+              <div className="flex items-center gap-0.5">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  disabled={locked}
+                  value={ed.taxRate}
+                  onChange={(e) => ed.setTaxRate(e.target.value)}
+                  onBlur={ed.commitTaxRate}
+                  className="w-12 px-1 py-0.5 text-xs text-right border border-transparent hover:border-slate-300 rounded disabled:bg-transparent"
+                />
+                <span className="text-xs text-slate-400">%</span>
+              </div>
+              {live != null && (
+                <span className="text-xs font-mono text-slate-600">= {live.toFixed(2)}</span>
+              )}
+            </div>
+          );
+        })()}
       </td>
       <td className="px-2 py-1 w-28">
         <input
@@ -492,17 +518,34 @@ function ItemCard({
           className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-800 disabled:bg-transparent"
         />
       </label>
-      {item.total_price != null && item.tax_rate != null && (
-        <div className="flex items-center justify-between text-xs border-t border-slate-100 pt-1.5">
-          <span className="text-slate-500">After tax</span>
-          <span className="font-mono text-slate-800">
-            {effectivePrice(item).toFixed(2)}
-            <span className="ml-1 text-slate-400 font-sans">
-              incl. {(item.tax_rate * 100).toFixed(0)}% tax
-            </span>
-          </span>
-        </div>
-      )}
+      {item.tax_rate != null && item.total_price != null && (() => {
+        const pct = asNumber(ed.taxRate);
+        const live = pct !== null ? item.total_price * (1 + pct / 100) : null;
+        return (
+          <div className="flex items-center justify-between text-xs border-t border-slate-100 pt-1.5">
+            <span className="text-slate-500">Tax rate</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-0.5">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  disabled={locked}
+                  value={ed.taxRate}
+                  onChange={(e) => ed.setTaxRate(e.target.value)}
+                  onBlur={ed.commitTaxRate}
+                  className="w-14 border border-slate-200 rounded px-1.5 py-0.5 text-right disabled:bg-transparent"
+                />
+                <span className="text-slate-400">%</span>
+              </div>
+              {live != null && (
+                <span className="font-mono text-slate-800">= {live.toFixed(2)}</span>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

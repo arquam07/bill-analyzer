@@ -1,5 +1,6 @@
 import asyncio
 import json
+from decimal import Decimal
 
 from google import genai
 from google.genai import types
@@ -10,6 +11,43 @@ from src.core.exceptions import OllamaUnavailable, VLMResponseInvalid
 from src.schemas.extraction import RawBillExtraction
 
 _MAX_RETRIES = 3
+
+
+def _correct_tax_rates(extraction: RawBillExtraction) -> RawBillExtraction:
+    """Detect and fix the case where the VLM applied tax to already tax-inclusive prices.
+
+    Computes two candidate item sums against the VLM-reported bill total:
+      - sum_excl: Σ total_price (tax ignored)
+      - sum_incl: Σ total_price * (1 + tax_rate)
+
+    If sum_excl is closer to bill.total the model added tax to prices that already
+    included it — strip all tax_rates.  If sum_incl is closer (or equal) the tax
+    is correct and is left unchanged.
+
+    Skips the check when bill.total is unknown or no item carries a tax_rate.
+    """
+    if extraction.total is None:
+        return extraction
+    if not any(it.tax_rate is not None and it.total_price is not None for it in extraction.items):
+        return extraction
+
+    bill_total = Decimal(str(extraction.total))
+    sum_excl = Decimal("0")
+    sum_incl = Decimal("0")
+    for it in extraction.items:
+        if it.total_price is None:
+            continue
+        price = Decimal(str(it.total_price))
+        sum_excl += price
+        sum_incl += price * (1 + Decimal(str(it.tax_rate or 0)))
+
+    if abs(bill_total - sum_excl) < abs(bill_total - sum_incl):
+        # Tax-exclusive sum is closer → VLM wrongly added tax; strip all tax_rates.
+        return extraction.model_copy(
+            update={"items": [it.model_copy(update={"tax_rate": None}) for it in extraction.items]}
+        )
+    return extraction
+
 
 _LANGUAGE_NAMES = {"en": "English", "ja": "Japanese"}
 
@@ -110,7 +148,7 @@ class VisionService:
             raw = response.text or ""
             try:
                 data = json.loads(raw)
-                return RawBillExtraction.model_validate(data)
+                return _correct_tax_rates(RawBillExtraction.model_validate(data))
             except (json.JSONDecodeError, TypeError) as exc:
                 last_exc = VLMResponseInvalid(
                     f"Vertex AI output is not valid JSON (attempt {attempt + 1}): {raw[:500]}"
