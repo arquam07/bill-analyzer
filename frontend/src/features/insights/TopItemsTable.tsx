@@ -25,20 +25,20 @@ export function TopItemsTable({
 }: Props) {
   const { currency } = useCurrency();
   return (
-    <div className="bg-white border border-slate-200 rounded">
-      <div className="flex items-center justify-between p-4 border-b border-slate-200">
-        <h2 className="text-sm font-semibold text-slate-900">Top items</h2>
-        <div className="inline-flex rounded border border-slate-200 overflow-hidden text-xs">
+    <div className="bg-card border border-slate-200 rounded-2xl shadow-card">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+        <h2 className="font-serif font-semibold text-[16px] tracking-[-0.01em] text-slate-900">Top items</h2>
+        <div className="inline-flex bg-slate-50 rounded-lg p-0.5 text-xs gap-0.5">
           {(["spend", "frequency"] as const).map((o) => (
             <button
               key={o}
               type="button"
               onClick={() => onOrderByChange(o)}
               className={
-                "px-2 py-1 border-l first:border-l-0 border-slate-200 " +
+                "px-2.5 py-1 rounded-md font-medium transition-all " +
                 (orderBy === o
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-700 hover:bg-slate-50")
+                  ? "bg-card shadow-sm text-slate-900"
+                  : "text-slate-500 hover:text-slate-800")
               }
             >
               by {o}
@@ -46,7 +46,7 @@ export function TopItemsTable({
           ))}
         </div>
       </div>
-      <div className="p-4">
+      <div className="px-6 py-4">
         {isLoading || !data ? (
           <div className="text-sm text-slate-400">Loading…</div>
         ) : isError ? (

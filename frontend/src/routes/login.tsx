@@ -1,15 +1,17 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "~/auth/AuthContext";
 import { ApiError } from "~/api/fetcher";
 
 function LoginPage() {
-  const { user, isLoading, login } = useAuth();
+  const { user, isLoading, login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     if (!isLoading && user) void navigate({ to: "/dashboard" });
@@ -21,20 +23,55 @@ function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      // navigation is handled by the useEffect above once user state updates
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Login failed");
       setSubmitting(false);
     }
   }
 
+  async function handleGoogleSuccess(credential: string) {
+    setGoogleLoading(true);
+    setError(null);
+    try {
+      const pending = await loginWithGoogle(credential);
+      if (pending) {
+        void navigate({ to: "/onboarding", state: pending } as never);
+      }
+      // if null, user is logged in and useEffect navigates to /dashboard
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Google sign-in failed");
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-[60vh] flex items-center justify-center py-8">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-md p-6 space-y-5">
+      <div className="w-full max-w-sm bg-card rounded-2xl shadow-md p-6 space-y-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
           <p className="text-sm text-slate-500 mt-1">Log in to your account</p>
         </div>
+
+        <div className={googleLoading || submitting ? "opacity-60 pointer-events-none" : ""}>
+          <GoogleLogin
+            onSuccess={({ credential }) => {
+              if (credential) void handleGoogleSuccess(credential);
+            }}
+            onError={() => setError("Google sign-in was cancelled or failed")}
+            width={336}
+            text="continue_with"
+            shape="rectangular"
+            theme="outline"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 text-xs text-slate-400">
+          <div className="flex-1 h-px bg-slate-200" />
+          or
+          <div className="flex-1 h-px bg-slate-200" />
+        </div>
+
         <form onSubmit={onSubmit} className="space-y-4">
           <label className="block text-sm">
             <span className="text-slate-700 font-medium">Email</span>
@@ -65,7 +102,7 @@ function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-slate-900 text-white rounded-xl px-3 py-3 text-base font-medium disabled:opacity-60 hover:bg-slate-800 transition-colors"
+            className="w-full bg-accent text-white rounded-xl px-3 py-3 text-base font-semibold disabled:opacity-60 hover:bg-accent-deep transition-colors"
           >
             {submitting ? "Logging in…" : "Log in"}
           </button>

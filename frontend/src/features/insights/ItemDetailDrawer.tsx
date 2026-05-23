@@ -47,7 +47,7 @@ export function ItemDetailDrawer({
         aria-hidden
       />
       {/* panel */}
-      <div className="fixed inset-y-0 right-0 w-full max-w-sm bg-white shadow-xl z-50 flex flex-col">
+      <div className="fixed inset-y-0 right-0 w-full max-w-sm bg-card border-l border-slate-200 shadow-xl z-50 flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <h2 className="text-sm font-semibold text-slate-900 truncate">{displayName}</h2>
           <button
@@ -108,24 +108,24 @@ export function ItemDetailDrawer({
                         <XAxis
                           dataKey="period"
                           tickFormatter={(v) => formatPeriodLabel(v, granularity)}
-                          stroke="#94a3b8"
+                          stroke="#8a8378"
                           fontSize={11}
                         />
                         <YAxis
                           tickFormatter={(v) => formatMoney(Number(v), currency)}
-                          stroke="#94a3b8"
+                          stroke="#8a8378"
                           fontSize={11}
                           width={60}
                         />
                         <Tooltip
                           formatter={(value) => formatMoney(Number(value), currency)}
                           labelFormatter={(label) => formatPeriodLabel(String(label), granularity)}
-                          cursor={{ stroke: "#e2e8f0" }}
+                          cursor={{ stroke: "#f1ede5" }}
                         />
                         <Line
                           type="monotone"
                           dataKey="total"
-                          stroke="#0f172a"
+                          stroke="#e0533d"
                           strokeWidth={2}
                           dot={false}
                           activeDot={{ r: 4 }}

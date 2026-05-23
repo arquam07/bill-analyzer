@@ -63,7 +63,7 @@ function BottomNav() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 sm:hidden bg-white border-t border-slate-200 z-40">
+    <nav className="fixed bottom-0 left-0 right-0 sm:hidden bg-card border-t border-slate-200 z-40">
       <div className="flex">
         {BOTTOM_NAV.map(({ key, label }) => {
           const active = isActive(key);
@@ -79,7 +79,7 @@ function BottomNav() {
                 })
               }
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] text-xs font-medium transition-colors ${
-                active ? "text-slate-900" : "text-slate-400"
+                active ? "text-accent" : "text-slate-400"
               }`}
             >
               <Icon />
@@ -92,26 +92,41 @@ function BottomNav() {
   );
 }
 
+function BrandMark() {
+  return (
+    <Link to="/" className="flex items-center gap-2.5 text-slate-900 no-underline">
+      <span
+        className="w-7 h-7 rounded-lg bg-slate-900 text-slate-50 grid place-items-center font-mono text-[13px] font-semibold shrink-0"
+        style={{ transform: "rotate(-4deg)" }}
+      >
+        ¥
+      </span>
+      <span className="font-serif font-semibold text-[18px] tracking-[-0.01em]">Bill Analyzer</span>
+    </Link>
+  );
+}
+
 function RootLayout() {
   const { user, isLoading, logout } = useAuth();
   const navigate = useNavigate();
+  const routerState = useRouterState();
+  const isLanding = routerState.location.pathname === "/";
 
   useEffect(() => {
-    const onUnauth = () => {
-      void navigate({ to: "/login" });
-    };
+    if (isLanding) return;
+    const onUnauth = () => void navigate({ to: "/login" });
     window.addEventListener("auth:unauthorized", onUnauth);
     return () => window.removeEventListener("auth:unauthorized", onUnauth);
-  }, [navigate]);
+  }, [navigate, isLanding]);
+
+  if (isLanding) return <Outlet />;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="font-bold text-slate-900 text-lg tracking-tight">
-            Bill Analyzer
-          </Link>
-          <nav className="flex items-center gap-3 text-sm">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-card">
+        <div className="max-w-app mx-auto px-7 h-[62px] flex items-center justify-between">
+          <BrandMark />
+          <nav className="flex items-center gap-6 text-sm font-medium">
             {user ? (
               <>
                 <Link to="/dashboard" className="hidden sm:block text-slate-600 hover:text-slate-900">
@@ -120,13 +135,13 @@ function RootLayout() {
                 <Link to="/upload" className="hidden sm:block text-slate-600 hover:text-slate-900">
                   Upload
                 </Link>
-                <span className="text-slate-500 text-sm hidden sm:inline">@{user.username}</span>
-                <span className="text-slate-500 text-sm sm:hidden">@{user.username.slice(0, 8)}</span>
+                <span className="text-accent-deep font-medium hidden sm:inline">@{user.username}</span>
+                <span className="text-accent-deep font-medium sm:hidden">@{user.username.slice(0, 8)}</span>
                 <button
                   onClick={() => {
                     void logout().then(() => navigate({ to: "/login" }));
                   }}
-                  className="text-slate-500 hover:text-slate-900 text-sm"
+                  className="text-slate-600 hover:text-slate-900"
                 >
                   Log out
                 </button>
@@ -135,12 +150,12 @@ function RootLayout() {
               <span className="text-slate-400">…</span>
             ) : (
               <>
-                <Link to="/login" className="text-slate-700 hover:text-slate-900">
+                <Link to="/login" className="text-slate-600 hover:text-slate-900">
                   Log in
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-slate-900 text-white text-sm rounded-lg px-4 py-2 hover:bg-slate-800"
+                  className="bg-accent text-white text-sm rounded-lg px-4 py-2 hover:bg-accent-deep transition-colors"
                 >
                   Sign up
                 </Link>
@@ -149,7 +164,7 @@ function RootLayout() {
           </nav>
         </div>
       </header>
-      <main className={`flex-1 max-w-4xl w-full mx-auto px-4 py-6 ${user ? "pb-20 sm:pb-6" : ""}`}>
+      <main className={`flex-1 max-w-app w-full mx-auto px-7 py-8 ${user ? "pb-24 sm:pb-10" : ""}`}>
         <Outlet />
       </main>
       <BottomNav />

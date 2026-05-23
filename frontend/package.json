@@ -14,6 +14,7 @@
     "gen-types": "openapi-typescript http://localhost:8000/openapi.json -o src/api/types.gen.ts"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.13.5",
     "@tanstack/react-query": "^5.62.0",
     "@tanstack/react-router": "^1.92.0",
     "react": "^18.3.1",

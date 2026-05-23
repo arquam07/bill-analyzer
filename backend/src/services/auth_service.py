@@ -1,7 +1,11 @@
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.exceptions import (
     EmailAlreadyExists,
+    GoogleAccountAlreadyExists,
+    GoogleTokenInvalid,
     InvalidCredentials,
     InvalidSessionToken,
     UsernameAlreadyExists,
@@ -13,6 +17,7 @@ from src.core.security import (
     verify_password,
 )
 from src.models.user import User
+from src.schemas.auth import GoogleAuthResponse, UserResponse
 from src.services.repositories.session_repository import SessionRepository
 from src.services.repositories.user_repository import UserRepository
 
@@ -51,7 +56,7 @@ class AuthService:
     async def login(self, *, email: str, password: str) -> tuple[User, str]:
         normalized = email.lower()
         user = await self._users.get_by_email(normalized)
-        if user is None or not verify_password(user.password_hash, password):
+        if user is None or user.password_hash is None or not verify_password(user.password_hash, password):
             raise InvalidCredentials()
         token = await self._issue_token(user)
         await self._session.commit()
@@ -60,6 +65,69 @@ class AuthService:
     async def logout(self, token: str) -> None:
         await self._sessions.delete_by_token_hash(hash_session_token(token))
         await self._session.commit()
+
+    def _verify_google_token(self, id_token: str, client_id: str) -> dict[str, str]:
+        try:
+            return google_id_token.verify_oauth2_token(  # type: ignore[no-any-return,no-untyped-call]
+                id_token, google_requests.Request(), client_id
+            )
+        except Exception as exc:
+            raise GoogleTokenInvalid(str(exc)) from exc
+
+    async def google_auth(self, *, id_token: str, client_id: str) -> GoogleAuthResponse:
+        info = self._verify_google_token(id_token, client_id)
+        google_id: str = info["sub"]
+        email: str = info["email"].lower()
+        name: str | None = info.get("name")
+
+        user = await self._users.get_by_google_id(google_id)
+        if user is None:
+            user = await self._users.get_by_email(email)
+            if user is not None:
+                user.google_id = google_id  # link existing password account
+
+        if user is not None:
+            token = await self._issue_token(user)
+            await self._session.commit()
+            return GoogleAuthResponse(
+                needs_onboarding=False,
+                user=UserResponse.model_validate(user),
+                token=token,
+            )
+
+        return GoogleAuthResponse(needs_onboarding=True, email=email, name=name)
+
+    async def google_complete(
+        self,
+        *,
+        id_token: str,
+        client_id: str,
+        username: str,
+        preferred_language: str,
+    ) -> tuple[User, str]:
+        info = self._verify_google_token(id_token, client_id)
+        google_id: str = info["sub"]
+        email: str = info["email"].lower()
+        name: str | None = info.get("name")
+
+        if await self._users.get_by_google_id(google_id) is not None:
+            raise GoogleAccountAlreadyExists()
+        if await self._users.get_by_username(username) is not None:
+            raise UsernameAlreadyExists(username)
+        if await self._users.get_by_email(email) is not None:
+            raise EmailAlreadyExists(email)
+
+        user = await self._users.create(
+            email=email,
+            username=username,
+            password_hash=None,
+            name=name,
+            preferred_language=preferred_language,
+            google_id=google_id,
+        )
+        token = await self._issue_token(user)
+        await self._session.commit()
+        return user, token
 
     async def authenticate_token(self, token: str) -> User:
         user_id = await self._sessions.get_user_id_by_token_hash(hash_session_token(token))

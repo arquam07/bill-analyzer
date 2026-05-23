@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     vertex_location: str = "asia-northeast1"
     vertex_model: str = "gemini-2.5-flash"
     vertex_timeout_seconds: float = 60.0
+    google_client_id: str = ""
 
 
 @lru_cache

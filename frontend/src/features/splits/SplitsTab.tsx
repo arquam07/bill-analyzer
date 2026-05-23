@@ -31,7 +31,7 @@ function RequestCard({
   const isPending = req.status === "pending";
 
   return (
-    <div className="border border-slate-200 rounded-2xl p-4 space-y-2 bg-white">
+    <div className="border border-slate-200 rounded-2xl p-4 space-y-2 bg-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">
@@ -79,7 +79,7 @@ function RequestCard({
             type="button"
             disabled={reject.isPending}
             onClick={() => reject.mutate(req.id)}
-            className="flex-1 bg-white border border-slate-300 text-sm rounded-lg px-3 py-2.5 disabled:opacity-50 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+            className="flex-1 bg-card border border-slate-300 text-sm rounded-lg px-3 py-2.5 disabled:opacity-50 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
           >
             {reject.isPending ? "…" : "Decline"}
           </button>
@@ -132,7 +132,7 @@ function SettleForm({ username }: { username: string }) {
       <button
         type="submit"
         disabled={settle.isPending || !amount}
-        className="bg-slate-800 text-white text-xs rounded px-3 py-1.5 disabled:opacity-50"
+        className="bg-slate-900 text-white text-xs rounded-lg px-3 py-1.5 font-medium disabled:opacity-50 hover:bg-slate-800 transition-colors"
       >
         {settle.isPending ? "…" : "Mark paid"}
       </button>
@@ -152,7 +152,7 @@ function FriendRequestCard({ fr }: { fr: FriendRequestResponse }) {
   const reject = useRejectFriendRequest();
 
   return (
-    <div className="border border-slate-200 rounded-2xl p-4 space-y-2 bg-white">
+    <div className="border border-slate-200 rounded-2xl p-4 space-y-2 bg-card">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium">
@@ -179,7 +179,7 @@ function FriendRequestCard({ fr }: { fr: FriendRequestResponse }) {
           type="button"
           disabled={reject.isPending}
           onClick={() => reject.mutate(fr.id)}
-          className="flex-1 bg-white border border-slate-300 text-sm rounded-lg px-3 py-2.5 disabled:opacity-50 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+          className="flex-1 bg-card border border-slate-300 text-sm rounded-lg px-3 py-2.5 disabled:opacity-50 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
         >
           {reject.isPending ? "…" : "Decline"}
         </button>
@@ -235,7 +235,7 @@ export function SplitsTab({ enabled = true }: { enabled?: boolean }) {
       {(balances.data?.balances.length ?? 0) > 0 && (
         <section className="space-y-3">
           <h2 className="font-medium text-slate-800">Balances</h2>
-          <ul className="divide-y divide-slate-100 border border-slate-200 rounded bg-white">
+          <ul className="divide-y divide-slate-100 border border-slate-200 rounded bg-card">
             {balances.data!.balances.map((b) => (
               <li key={b.user_id} className="px-4 py-3 space-y-1.5">
                 <div className="flex items-center justify-between">

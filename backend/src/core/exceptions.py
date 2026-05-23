@@ -114,5 +114,13 @@ class AlreadyFriends(AppError):
     pass
 
 
+class GoogleTokenInvalid(AppError):
+    """Google ID token failed verification."""
+
+
+class GoogleAccountAlreadyExists(AppError):
+    """Google account already has a completed profile (race on /complete)."""
+
+
 class AssignmentItemsInvalid(AppError):
     """Item doesn't belong to the bill, has no price, or is assigned to multiple recipients."""

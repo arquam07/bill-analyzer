@@ -3,8 +3,23 @@ from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import bearer_scheme, get_db
-from src.core.exceptions import EmailAlreadyExists, InvalidCredentials, UsernameAlreadyExists
-from src.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from src.core.config import get_settings
+from src.core.exceptions import (
+    EmailAlreadyExists,
+    GoogleAccountAlreadyExists,
+    GoogleTokenInvalid,
+    InvalidCredentials,
+    UsernameAlreadyExists,
+)
+from src.schemas.auth import (
+    GoogleAuthRequest,
+    GoogleAuthResponse,
+    GoogleCompleteRequest,
+    LoginRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+)
 from src.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -45,6 +60,41 @@ async def login(
         )
     except InvalidCredentials as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials") from exc
+    return TokenResponse(user=UserResponse.model_validate(user), token=token)
+
+
+@router.post("/google", response_model=GoogleAuthResponse)
+async def google_auth(
+    payload: GoogleAuthRequest, db: AsyncSession = Depends(get_db)
+) -> GoogleAuthResponse:
+    try:
+        return await AuthService(db).google_auth(
+            id_token=payload.id_token,
+            client_id=get_settings().google_client_id,
+        )
+    except GoogleTokenInvalid as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid Google token") from exc
+
+
+@router.post("/google/complete", response_model=TokenResponse)
+async def google_complete(
+    payload: GoogleCompleteRequest, db: AsyncSession = Depends(get_db)
+) -> TokenResponse:
+    try:
+        user, token = await AuthService(db).google_complete(
+            id_token=payload.id_token,
+            client_id=get_settings().google_client_id,
+            username=payload.username,
+            preferred_language=payload.preferred_language,
+        )
+    except GoogleTokenInvalid as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid Google token") from exc
+    except GoogleAccountAlreadyExists as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, "account already exists") from exc
+    except UsernameAlreadyExists as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, "username already taken") from exc
+    except EmailAlreadyExists as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, "email already registered") from exc
     return TokenResponse(user=UserResponse.model_validate(user), token=token)
 
 

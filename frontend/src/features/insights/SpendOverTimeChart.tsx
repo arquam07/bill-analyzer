@@ -1,7 +1,7 @@
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -21,10 +21,12 @@ interface Props {
 export function SpendOverTimeChart({ data, granularity, isLoading, isError }: Props) {
   const { currency } = useCurrency();
   return (
-    <div className="bg-white border border-slate-200 rounded p-4">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-sm font-semibold text-slate-900">Spend over time</h2>
-        <span className="text-xs text-slate-500">by {granularity}</span>
+    <div className="bg-card border border-slate-200 rounded-2xl p-6 shadow-card">
+      <div className="flex items-baseline justify-between mb-5">
+        <h2 className="font-serif font-semibold text-[18px] tracking-[-0.01em] text-slate-900">
+          Spend over time
+        </h2>
+        <span className="font-mono text-xs text-slate-400">by {granularity}</span>
       </div>
       <div className="h-64">
         {isLoading || !data ? (
@@ -41,36 +43,56 @@ export function SpendOverTimeChart({ data, granularity, isLoading, isError }: Pr
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart
+            <AreaChart
               data={data.points}
               margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <defs>
+                <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#e0533d" stopOpacity={0.14} />
+                  <stop offset="95%" stopColor="#e0533d" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1ede5" vertical={false} />
               <XAxis
                 dataKey="period"
                 tickFormatter={(v) => formatPeriodLabel(v, granularity)}
-                stroke="#94a3b8"
-                fontSize={12}
+                stroke="#938b7f"
+                fontSize={11}
+                fontFamily="'Spline Sans Mono', monospace"
+                tickLine={false}
               />
               <YAxis
                 tickFormatter={(v) => formatMoney(Number(v), currency)}
-                stroke="#94a3b8"
-                fontSize={12}
-                width={70}
+                stroke="#938b7f"
+                fontSize={11}
+                fontFamily="'Spline Sans Mono', monospace"
+                width={72}
+                axisLine={false}
+                tickLine={false}
               />
               <Tooltip
                 formatter={(value) => formatMoney(Number(value), currency)}
                 labelFormatter={(label) => formatPeriodLabel(String(label), granularity)}
+                contentStyle={{
+                  background: "#1c1a17",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                }}
+                labelStyle={{ color: "#938b7f", fontFamily: "'Spline Sans Mono', monospace", fontSize: 11 }}
+                itemStyle={{ color: "#faf9f6", fontFamily: "'Spline Sans Mono', monospace", fontSize: 13, fontWeight: 600 }}
               />
-              <Line
-                type="monotone"
+              <Area
+                type="linear"
                 dataKey="total"
-                stroke="#0f172a"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
+                stroke="#e0533d"
+                strokeWidth={2.5}
+                fill="url(#spendGradient)"
+                dot={{ r: 3, fill: "#fff", stroke: "#e0533d", strokeWidth: 2 }}
+                activeDot={{ r: 5, fill: "#e0533d" }}
               />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         )}
       </div>

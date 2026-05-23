@@ -52,3 +52,37 @@ class UserResponse(BaseModel):
 class TokenResponse(BaseModel):
     user: UserResponse
     token: str
+
+
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+
+
+class GoogleAuthResponse(BaseModel):
+    needs_onboarding: bool
+    # present when needs_onboarding=False
+    user: UserResponse | None = None
+    token: str | None = None
+    # present when needs_onboarding=True
+    email: str | None = None
+    name: str | None = None
+
+
+class GoogleCompleteRequest(BaseModel):
+    id_token: str
+    username: str = Field(min_length=3, max_length=50)
+    preferred_language: str = Field(default=DEFAULT_LANGUAGE, max_length=8)
+
+    @field_validator("username")
+    @classmethod
+    def username_format(cls, v: str) -> str:
+        if not _USERNAME_RE.match(v):
+            raise ValueError("username must be 3-50 lowercase alphanumeric characters")
+        return v
+
+    @field_validator("preferred_language")
+    @classmethod
+    def language_supported(cls, v: str) -> str:
+        if v not in SUPPORTED_LANGUAGES:
+            raise ValueError(f"preferred_language must be one of {SUPPORTED_LANGUAGES}")
+        return v

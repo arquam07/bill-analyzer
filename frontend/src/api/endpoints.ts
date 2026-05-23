@@ -28,6 +28,14 @@ import type {
   UserResponse,
 } from "./types";
 
+export interface GoogleAuthResponse {
+  needs_onboarding: boolean;
+  user?: UserResponse;
+  token?: string;
+  email?: string;
+  name?: string;
+}
+
 export const auth = {
   register: (body: RegisterRequest) =>
     apiRequest<TokenResponse>("/auth/register", { method: "POST", body }),
@@ -35,6 +43,10 @@ export const auth = {
     apiRequest<TokenResponse>("/auth/login", { method: "POST", body }),
   logout: () => apiVoid("/auth/logout", { method: "POST" }),
   me: () => apiRequest<UserResponse>("/me"),
+  googleAuth: (idToken: string) =>
+    apiRequest<GoogleAuthResponse>("/auth/google", { method: "POST", body: { id_token: idToken } }),
+  googleComplete: (body: { id_token: string; username: string; preferred_language: string }) =>
+    apiRequest<TokenResponse>("/auth/google/complete", { method: "POST", body }),
 };
 
 export const bills = {

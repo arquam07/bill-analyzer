@@ -14,17 +14,17 @@ export function TimeRangePicker({ preset, customFrom, customTo, onChange }: Prop
 
   return (
     <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
-      <div className="flex overflow-x-auto rounded border border-slate-200 bg-white overflow-hidden max-w-full">
+      <div className="inline-flex bg-card border border-slate-200 rounded-[10px] p-1 gap-0.5 overflow-x-auto max-w-full">
         {PRESETS.map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => setPreset(p)}
             className={
-              "px-3 py-1.5 text-sm border-l first:border-l-0 border-slate-200 " +
+              "px-3.5 py-1.5 text-[13.5px] font-medium rounded-[7px] transition-all duration-150 whitespace-nowrap " +
               (preset === p
-                ? "bg-slate-900 text-white"
-                : "text-slate-700 hover:bg-slate-50")
+                ? "bg-slate-900 text-slate-50 shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100")
             }
           >
             {PRESET_LABEL[p]}
@@ -37,15 +37,15 @@ export function TimeRangePicker({ preset, customFrom, customTo, onChange }: Prop
             type="date"
             value={customFrom}
             onChange={(e) => setFrom(e.target.value)}
-            className="border border-slate-200 rounded px-2 py-1"
+            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-card"
             aria-label="From date"
           />
-          <span className="text-slate-500">to</span>
+          <span className="text-slate-400">to</span>
           <input
             type="date"
             value={customTo}
             onChange={(e) => setTo(e.target.value)}
-            className="border border-slate-200 rounded px-2 py-1"
+            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-card"
             aria-label="To date"
           />
         </div>

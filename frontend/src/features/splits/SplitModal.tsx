@@ -239,7 +239,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
   if (nonFriendQueue !== null) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="bg-white rounded-2xl shadow-xl w-full sm:max-w-md mx-4 p-6 space-y-4">
+        <div className="bg-card rounded-2xl shadow-xl w-full sm:max-w-md mx-4 p-6 space-y-4">
           <h2 className="text-lg font-semibold">Not in your friends list</h2>
           <p className="text-sm text-slate-600">
             {nonFriendQueue.length === 1 ? "This user is" : "These users are"} not in your friends
@@ -272,7 +272,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
               type="button"
               disabled={sendFriendMutation.isPending}
               onClick={() => sendFriendMutation.mutate(nonFriendQueue)}
-              className="bg-slate-900 text-white text-sm rounded px-4 py-2 disabled:opacity-50"
+              className="bg-accent text-white text-sm rounded-lg px-4 py-2 font-medium disabled:opacity-50 hover:bg-accent-deep transition-colors"
             >
               {sendFriendMutation.isPending
                 ? "Sending…"
@@ -289,7 +289,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg sm:mx-4 p-6 space-y-5 max-h-[92vh] overflow-y-auto">
+      <div className="bg-card rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg sm:mx-4 p-6 space-y-5 max-h-[92vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
@@ -314,7 +314,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
               onClick={() => setMode("equal")}
               className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
                 mode === "equal"
-                  ? "bg-white shadow-sm text-slate-900"
+                  ? "bg-card shadow-sm text-slate-900"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -325,7 +325,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
               onClick={() => setMode("assign")}
               className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
                 mode === "assign"
-                  ? "bg-white shadow-sm text-slate-900"
+                  ? "bg-card shadow-sm text-slate-900"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -401,7 +401,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
                 type="button"
                 onClick={() => void addUser()}
                 disabled={!rawInput.trim() || isLooking}
-                className="bg-slate-800 text-white text-sm rounded px-4 py-2 disabled:opacity-50"
+                className="bg-slate-900 text-white text-sm rounded-lg px-4 py-2 font-medium disabled:opacity-50 hover:bg-slate-800 transition-colors"
               >
                 {isLooking ? "…" : "Add"}
               </button>
@@ -409,7 +409,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
 
             {/* Friends dropdown */}
             {showDropdown && suggestions.length > 0 && (
-              <ul className="absolute z-10 left-0 right-12 mt-1 bg-white border border-slate-200 rounded shadow-lg max-h-48 overflow-y-auto text-sm">
+              <ul className="absolute z-10 left-0 right-12 mt-1 bg-card border border-slate-200 rounded shadow-lg max-h-48 overflow-y-auto text-sm">
                 {suggestions.map((f) => (
                   <li key={f.user_id}>
                     <button
@@ -492,7 +492,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
                         className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                           myAssignments.has(item.id)
                             ? "bg-emerald-600 text-white border-emerald-600"
-                            : "bg-white text-slate-500 border-slate-300"
+                            : "bg-card text-slate-500 border-slate-300"
                         }`}
                       >
                         Me
@@ -506,7 +506,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
                           className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                             assignments[u.username]?.has(item.id)
                               ? "bg-slate-900 text-white border-slate-900"
-                              : "bg-white text-slate-500 border-slate-300"
+                              : "bg-card text-slate-500 border-slate-300"
                           }`}
                         >
                           @{u.username}
@@ -584,7 +584,7 @@ export function SplitModal({ billId, total, merchant, items, onClose, onSuccess 
             type="button"
             disabled={sendDisabled}
             onClick={() => sendMutation.mutate()}
-            className="bg-slate-900 text-white text-sm rounded px-4 py-2 disabled:opacity-50"
+            className="bg-accent text-white text-sm rounded-lg px-4 py-2 font-medium disabled:opacity-50 hover:bg-accent-deep transition-colors"
           >
             {sendMutation.isPending
               ? "Sending…"

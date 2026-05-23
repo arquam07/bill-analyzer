@@ -51,7 +51,7 @@ function UploadPage() {
 
   return (
     <div className="max-w-md mx-auto space-y-4">
-      <h1 className="text-2xl font-semibold text-slate-900">Upload a bill</h1>
+      <h1 className="font-serif font-semibold text-[30px] tracking-[-0.015em] text-slate-900">Upload a bill</h1>
       <p className="text-sm text-slate-500">Take a photo or choose an image from your library.</p>
 
       {/* Tap-to-select zone */}
@@ -68,7 +68,7 @@ function UploadPage() {
           className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-10 transition-colors ${
             file
               ? "border-slate-400 bg-slate-50"
-              : "border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50"
+              : "border-slate-300 bg-card hover:border-slate-400 hover:bg-slate-50"
           }`}
         >
           {previewUrl ? (
@@ -109,7 +109,7 @@ function UploadPage() {
         type="button"
         disabled={!file || upload.isPending}
         onClick={() => file && upload.mutate(file)}
-        className="w-full bg-slate-900 text-white rounded-xl px-4 py-3.5 text-base font-medium disabled:opacity-50 hover:bg-slate-800 transition-colors"
+        className="w-full bg-accent text-white rounded-xl px-4 py-3.5 text-base font-semibold disabled:opacity-50 hover:bg-accent-deep transition-colors"
       >
         {upload.isPending ? "Uploading…" : "Upload bill"}
       </button>

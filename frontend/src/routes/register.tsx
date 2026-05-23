@@ -1,10 +1,11 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "~/auth/AuthContext";
 import { ApiError } from "~/api/fetcher";
 
 function RegisterPage() {
-  const { user, isLoading, register } = useAuth();
+  const { user, isLoading, register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -13,10 +14,26 @@ function RegisterPage() {
   const [language, setLanguage] = useState("en");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     if (!isLoading && user) void navigate({ to: "/dashboard" });
   }, [user, isLoading, navigate]);
+
+  async function handleGoogleSuccess(credential: string) {
+    setGoogleLoading(true);
+    setError(null);
+    try {
+      const pending = await loginWithGoogle(credential);
+      if (pending) {
+        void navigate({ to: "/onboarding", state: pending } as never);
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Google sign-in failed");
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,11 +56,31 @@ function RegisterPage() {
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center py-8">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-md p-6 space-y-5">
+      <div className="w-full max-w-sm bg-card rounded-2xl shadow-md p-6 space-y-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Create account</h1>
           <p className="text-sm text-slate-500 mt-1">Start tracking your bills</p>
         </div>
+
+        <div className={googleLoading || submitting ? "opacity-60 pointer-events-none" : ""}>
+          <GoogleLogin
+            onSuccess={({ credential }) => {
+              if (credential) void handleGoogleSuccess(credential);
+            }}
+            onError={() => setError("Google sign-in was cancelled or failed")}
+            width={336}
+            text="signup_with"
+            shape="rectangular"
+            theme="outline"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 text-xs text-slate-400">
+          <div className="flex-1 h-px bg-slate-200" />
+          or
+          <div className="flex-1 h-px bg-slate-200" />
+        </div>
+
         <form onSubmit={onSubmit} className="space-y-4">
           <label className="block text-sm">
             <span className="text-slate-700 font-medium">Email</span>
@@ -94,7 +131,7 @@ function RegisterPage() {
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className={`${inputCls} bg-white`}
+              className={`${inputCls} bg-card`}
             >
               <option value="en">English</option>
               <option value="ja">日本語 (Japanese)</option>
@@ -111,7 +148,7 @@ function RegisterPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-slate-900 text-white rounded-xl px-3 py-3 text-base font-medium disabled:opacity-60 hover:bg-slate-800 transition-colors"
+            className="w-full bg-accent text-white rounded-xl px-3 py-3 text-base font-semibold disabled:opacity-60 hover:bg-accent-deep transition-colors"
           >
             {submitting ? "Creating…" : "Create account"}
           </button>

@@ -215,7 +215,7 @@ function BillFields({
             setCategory(next);
             commitIfChanged("category", next || null, bill.category ?? null);
           }}
-          className={`${inputCls} bg-white`}
+          className={`${inputCls} bg-card`}
         >
           <option value="">(uncategorized)</option>
           {BILL_CATEGORIES.map((c) => (
@@ -424,7 +424,7 @@ function AddItemRow({ onAdd }: { onAdd: (body: BillItemCreateRequest) => void })
           type="button"
           onClick={submit}
           disabled={!name.trim()}
-          className="w-full bg-slate-800 text-white text-sm rounded px-2 py-1 disabled:opacity-50"
+          className="w-full bg-slate-900 text-white text-sm rounded-lg px-2 py-1 font-medium disabled:opacity-50 hover:bg-slate-800 transition-colors"
         >
           Add
         </button>
@@ -447,7 +447,7 @@ function ItemCard({
   const ed = useItemEditor(item, onUpdate);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+    <div className="bg-card border border-slate-200 rounded-xl p-3 space-y-2">
       <div className="flex items-center gap-2">
         <input
           type="text"
@@ -585,7 +585,7 @@ function AddItemCard({ onAdd }: { onAdd: (body: BillItemCreateRequest) => void }
           type="button"
           onClick={submit}
           disabled={!name.trim()}
-          className="bg-slate-800 text-white text-sm rounded-lg px-4 py-2.5 disabled:opacity-50"
+          className="bg-accent text-white text-sm rounded-lg px-4 py-2.5 font-medium disabled:opacity-50 hover:bg-accent-deep transition-colors"
         >
           Add
         </button>
@@ -747,7 +747,7 @@ function BillDetail() {
                   label="Re-extract"
                   reextract
                   onClick={() => extract.mutate()}
-                  className="bg-white border border-slate-300 text-sm rounded-lg px-4 py-2.5 disabled:opacity-60"
+                  className="bg-card border border-slate-300 text-sm rounded-lg px-4 py-2.5 disabled:opacity-60"
                 />
               )}
               <button
@@ -780,7 +780,7 @@ function BillDetail() {
         </div>
       )}
 
-      <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+      <section className="bg-card border border-slate-200 rounded-2xl p-4 space-y-3">
         <h2 className="font-semibold text-slate-800">Details</h2>
         <BillFields
           bill={bill}
@@ -789,7 +789,7 @@ function BillDetail() {
         />
       </section>
 
-      <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+      <section className="bg-card border border-slate-200 rounded-2xl p-4 space-y-3">
         <h2 className="font-semibold text-slate-800">Items</h2>
         {items.length === 0 ? (
           <p className="text-sm text-slate-500">
@@ -859,7 +859,7 @@ function BillDetail() {
       </section>
 
       {bill.raw_ocr_text && (
-        <details className="bg-white border border-slate-200 rounded-2xl p-4">
+        <details className="bg-card border border-slate-200 rounded-2xl p-4">
           <summary className="cursor-pointer text-sm text-slate-600 font-medium select-none">
             Raw OCR text
           </summary>
@@ -888,7 +888,7 @@ function BillDetail() {
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+          <div className="bg-card rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
             <h2 className="text-lg font-semibold text-slate-900">Delete this bill?</h2>
             <p className="text-sm text-slate-600">
               This will permanently delete{" "}

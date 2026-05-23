@@ -40,7 +40,7 @@ export function BillsList() {
   }
 
   return (
-    <ul className="divide-y divide-slate-200 bg-white border border-slate-200 rounded-2xl overflow-hidden">
+    <ul className="divide-y divide-slate-200 bg-card border border-slate-200 rounded-2xl overflow-hidden shadow-card">
       {data.items.map((b) => (
         <li key={b.id}>
           <Link
