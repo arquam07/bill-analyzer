@@ -124,7 +124,7 @@ function RootLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-card">
-        <div className="max-w-app mx-auto px-7 h-[62px] flex items-center justify-between">
+        <div className="max-w-app mx-auto px-4 sm:px-7 h-[62px] flex items-center justify-between">
           <BrandMark />
           <nav className="flex items-center gap-6 text-sm font-medium">
             {user ? (
@@ -164,7 +164,7 @@ function RootLayout() {
           </nav>
         </div>
       </header>
-      <main className={`flex-1 max-w-app w-full mx-auto px-7 py-8 ${user ? "pb-24 sm:pb-10" : ""}`}>
+      <main className={`flex-1 max-w-app w-full mx-auto px-4 sm:px-7 py-6 sm:py-8 ${user ? "pb-24 sm:pb-10" : ""}`}>
         <Outlet />
       </main>
       <BottomNav />

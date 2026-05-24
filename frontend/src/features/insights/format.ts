@@ -3,7 +3,11 @@ const fmtCache = new Map<string, Intl.NumberFormat>();
 function getMoneyFmt(currency: string): Intl.NumberFormat {
   let fmt = fmtCache.get(currency);
   if (!fmt) {
-    fmt = new Intl.NumberFormat(undefined, { style: "currency", currency });
+    fmt = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+    });
     fmtCache.set(currency, fmt);
   }
   return fmt;
