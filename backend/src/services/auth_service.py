@@ -67,6 +67,8 @@ class AuthService:
         await self._session.commit()
 
     def _verify_google_token(self, id_token: str, client_id: str) -> dict[str, str]:
+        if not client_id:
+            raise GoogleTokenInvalid("GOOGLE_CLIENT_ID is not configured on the server")
         try:
             return google_id_token.verify_oauth2_token(  # type: ignore[no-any-return,no-untyped-call]
                 id_token, google_requests.Request(), client_id
