@@ -1,3 +1,5 @@
+import logging
+
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +22,9 @@ from src.models.user import User
 from src.schemas.auth import GoogleAuthResponse, UserResponse
 from src.services.repositories.session_repository import SessionRepository
 from src.services.repositories.user_repository import UserRepository
+
+
+_log = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -74,6 +79,7 @@ class AuthService:
                 id_token, google_requests.Request(), client_id
             )
         except Exception as exc:
+            _log.error("Google token verification failed: %s", exc)
             raise GoogleTokenInvalid(str(exc)) from exc
 
     async def google_auth(self, *, id_token: str, client_id: str) -> GoogleAuthResponse:

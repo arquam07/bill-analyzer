@@ -18,6 +18,7 @@ dist/
 .env
 .env.local
 *.local
+.env.production
 
 # OS / IDE
 .DS_Store
