@@ -73,7 +73,10 @@ async def google_auth(
             client_id=get_settings().google_client_id,
         )
     except GoogleTokenInvalid as exc:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid Google token") from exc
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            f"invalid Google token: {exc}",
+        ) from exc
 
 
 @router.post("/google/complete", response_model=TokenResponse)
