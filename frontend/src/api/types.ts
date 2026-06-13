@@ -176,7 +176,16 @@ export interface SettlementResponse {
   id: string;
   from_username: string;
   to_username: string;
+  initiated_by_username: string;
   amount: number;
+  status: "pending" | "accepted" | "rejected";
   note: string | null;
   created_at: string;
+  responded_at: string | null;
 }
+
+export interface SettlementListResponse {
+  items: SettlementResponse[];
+}
+
+export type SettlementDirection = "paid" | "received";

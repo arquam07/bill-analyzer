@@ -117,10 +117,22 @@ class SplitSettlement(Base):
         nullable=False,
         index=True,
     )
+    initiated_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=STATUS_PENDING
+    )
     note: Mapped[str | None] = mapped_column(String(256), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    responded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     from_user: Mapped["User"] = relationship(  # type: ignore[name-defined]
@@ -128,4 +140,7 @@ class SplitSettlement(Base):
     )
     to_user: Mapped["User"] = relationship(  # type: ignore[name-defined]
         "User", foreign_keys=[to_user_id]
+    )
+    initiated_by: Mapped["User"] = relationship(  # type: ignore[name-defined]
+        "User", foreign_keys=[initiated_by_user_id]
     )

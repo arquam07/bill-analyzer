@@ -20,6 +20,8 @@ import type {
   LoginRequest,
   RecipientAssignment,
   RegisterRequest,
+  SettlementDirection,
+  SettlementListResponse,
   SettlementResponse,
   SplitRequestListResponse,
   SplitRequestResponse,
@@ -104,8 +106,20 @@ export const splitRequests = {
   reject: (id: string) =>
     apiRequest<SplitRequestResponse>(`/split-requests/${id}/reject`, { method: "POST" }),
   balances: () => apiRequest<BalancesResponse>("/balances"),
-  settle: (body: { username: string; amount: number; note?: string }) =>
-    apiRequest<SettlementResponse>("/settlements", { method: "POST", body }),
+  settle: (body: {
+    username: string;
+    amount: number;
+    direction: SettlementDirection;
+    note?: string;
+  }) => apiRequest<SettlementResponse>("/settlements", { method: "POST", body }),
+  listIncomingSettlements: () =>
+    apiRequest<SettlementListResponse>("/settlements/incoming"),
+  listOutgoingSettlements: () =>
+    apiRequest<SettlementListResponse>("/settlements/outgoing"),
+  acceptSettlement: (id: string) =>
+    apiRequest<SettlementResponse>(`/settlements/${id}/accept`, { method: "POST" }),
+  rejectSettlement: (id: string) =>
+    apiRequest<SettlementResponse>(`/settlements/${id}/reject`, { method: "POST" }),
 };
 
 export const friends = {

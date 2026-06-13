@@ -124,3 +124,15 @@ class GoogleAccountAlreadyExists(AppError):
 
 class AssignmentItemsInvalid(AppError):
     """Item doesn't belong to the bill, has no price, or is assigned to multiple recipients."""
+
+
+class SettlementNotFound(AppError):
+    pass
+
+
+class SettlementNotPending(AppError):
+    """Accept/reject attempted on a non-pending settlement request."""
+
+
+class SettlementNotRecipient(AppError):
+    """User tried to accept/reject a settlement they initiated themselves."""

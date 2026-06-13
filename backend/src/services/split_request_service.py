@@ -8,6 +8,9 @@ from src.core.exceptions import (
     AssignmentItemsInvalid,
     BillHasNoTotal,
     BillNotFound,
+    SettlementNotFound,
+    SettlementNotPending,
+    SettlementNotRecipient,
     SplitItemsInvalid,
     SplitRequestAlreadyExists,
     SplitRequestNotFound,
@@ -30,6 +33,7 @@ from src.schemas.split_request import (
     BillSummary,
     NonFriendInfo,
     RecipientAssignment,
+    SettlementListResponse,
     SettlementResponse,
     SplitRequestListResponse,
     SplitRequestResponse,
@@ -42,6 +46,20 @@ from src.services.repositories.user_repository import UserRepository
 
 def _to_float(d: Decimal) -> float:
     return float(d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _settlement_to_response(s: SplitSettlement) -> SettlementResponse:
+    return SettlementResponse(
+        id=s.id,
+        from_username=s.from_user.username,
+        to_username=s.to_user.username,
+        initiated_by_username=s.initiated_by.username,
+        amount=_to_float(s.amount),
+        status=s.status,
+        note=s.note,
+        created_at=s.created_at,
+        responded_at=s.responded_at,
+    )
 
 
 def _sr_to_response(sr: SplitRequest) -> SplitRequestResponse:
@@ -356,26 +374,71 @@ class SplitRequestService:
         return BalancesResponse(balances=sorted(balances, key=lambda b: b.username))
 
     async def settle(
-        self, *, from_user: User, username: str, amount: float, note: str | None
+        self,
+        *,
+        from_user: User,
+        username: str,
+        amount: float,
+        direction: str,
+        note: str | None,
     ) -> SettlementResponse:
-        to_user = await self._users.get_by_username(username)
-        if to_user is None:
+        counterparty = await self._users.get_by_username(username)
+        if counterparty is None:
             raise UserNotFound(username)
-        if to_user.id == from_user.id:
+        if counterparty.id == from_user.id:
             raise SplitWithSelf()
 
+        # direction is from the initiator's perspective.
+        # "paid"     -> initiator paid counterparty   (payer=initiator, recipient=counterparty)
+        # "received" -> initiator received from cpty  (payer=counterparty, recipient=initiator)
+        if direction == "paid":
+            payer_id, recipient_id = from_user.id, counterparty.id
+        else:
+            payer_id, recipient_id = counterparty.id, from_user.id
+
         s = await self._repo.create_settlement(
-            from_user_id=from_user.id,
-            to_user_id=to_user.id,
+            from_user_id=payer_id,
+            to_user_id=recipient_id,
+            initiated_by_user_id=from_user.id,
             amount=Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
             note=note,
+            status=STATUS_PENDING,
         )
         await self._session.commit()
-        return SettlementResponse(
-            id=s.id,
-            from_username=s.from_user.username,
-            to_username=s.to_user.username,
-            amount=_to_float(s.amount),
-            note=s.note,
-            created_at=s.created_at,
-        )
+        return _settlement_to_response(s)
+
+    async def list_incoming_settlements(self, user: User) -> SettlementListResponse:
+        items = await self._repo.list_incoming_settlements(user.id)
+        return SettlementListResponse(items=[_settlement_to_response(s) for s in items])
+
+    async def list_outgoing_settlements(self, user: User) -> SettlementListResponse:
+        items = await self._repo.list_outgoing_settlements(user.id)
+        return SettlementListResponse(items=[_settlement_to_response(s) for s in items])
+
+    async def accept_settlement(
+        self, *, settlement_id: uuid.UUID, user: User
+    ) -> SettlementResponse:
+        s = await self._repo.get_settlement_by_id(settlement_id)
+        if s is None:
+            raise SettlementNotFound(str(settlement_id))
+        if s.initiated_by_user_id == user.id or user.id not in (s.from_user_id, s.to_user_id):
+            raise SettlementNotRecipient()
+        if s.status != STATUS_PENDING:
+            raise SettlementNotPending()
+        s = await self._repo.set_settlement_status(s, STATUS_ACCEPTED)
+        await self._session.commit()
+        return _settlement_to_response(s)
+
+    async def reject_settlement(
+        self, *, settlement_id: uuid.UUID, user: User
+    ) -> SettlementResponse:
+        s = await self._repo.get_settlement_by_id(settlement_id)
+        if s is None:
+            raise SettlementNotFound(str(settlement_id))
+        if s.initiated_by_user_id == user.id or user.id not in (s.from_user_id, s.to_user_id):
+            raise SettlementNotRecipient()
+        if s.status != STATUS_PENDING:
+            raise SettlementNotPending()
+        s = await self._repo.set_settlement_status(s, STATUS_REJECTED)
+        await self._session.commit()
+        return _settlement_to_response(s)

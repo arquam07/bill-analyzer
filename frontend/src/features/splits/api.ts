@@ -49,10 +49,51 @@ export function useRejectRequest() {
 export function useSettle() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { username: string; amount: number; note?: string }) =>
-      api.settle(body),
+    mutationFn: (body: {
+      username: string;
+      amount: number;
+      direction: "paid" | "received";
+      note?: string;
+    }) => api.settle(body),
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["settlements"] });
+    },
+  });
+}
+
+export function useIncomingSettlements(enabled = true) {
+  return useQuery({
+    queryKey: ["settlements", "incoming"],
+    queryFn: () => api.listIncomingSettlements(),
+    enabled,
+  });
+}
+
+export function useOutgoingSettlements(enabled = true) {
+  return useQuery({
+    queryKey: ["settlements", "outgoing"],
+    queryFn: () => api.listOutgoingSettlements(),
+    enabled,
+  });
+}
+
+export function useAcceptSettlement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.acceptSettlement(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["settlements"] });
       void qc.invalidateQueries({ queryKey: ["balances"] });
+    },
+  });
+}
+
+export function useRejectSettlement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.rejectSettlement(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["settlements"] });
     },
   });
 }

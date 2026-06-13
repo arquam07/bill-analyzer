@@ -76,6 +76,7 @@ class BalancesResponse(BaseModel):
 class SettleRequest(BaseModel):
     username: str
     amount: float = Field(gt=0)
+    direction: str = Field(pattern=r"^(paid|received)$")
     note: str | None = Field(default=None, max_length=256)
 
 
@@ -83,6 +84,13 @@ class SettlementResponse(BaseModel):
     id: uuid.UUID
     from_username: str
     to_username: str
+    initiated_by_username: str
     amount: float
+    status: str
     note: str | None
     created_at: datetime
+    responded_at: datetime | None = None
+
+
+class SettlementListResponse(BaseModel):
+    items: list[SettlementResponse]

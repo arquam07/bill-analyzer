@@ -8,6 +8,9 @@ from src.core.exceptions import (
     AssignmentItemsInvalid,
     BillHasNoTotal,
     BillNotFound,
+    SettlementNotFound,
+    SettlementNotPending,
+    SettlementNotRecipient,
     SplitItemsInvalid,
     SplitRequestAlreadyExists,
     SplitRequestNotFound,
@@ -19,8 +22,9 @@ from src.core.exceptions import (
 from src.models.user import User
 from src.schemas.split_request import (
     BalancesResponse,
-    SettlementResponse,
     SettleRequest,
+    SettlementListResponse,
+    SettlementResponse,
     SplitRequestCreate,
     SplitRequestListResponse,
     SplitRequestResponse,
@@ -163,11 +167,71 @@ async def create_settlement(
 ) -> SettlementResponse:
     try:
         return await _svc(db).settle(
-            from_user=user, username=body.username, amount=body.amount, note=body.note
+            from_user=user,
+            username=body.username,
+            amount=body.amount,
+            direction=body.direction,
+            note=body.note,
         )
     except UserNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "user not found") from exc
     except SplitWithSelf as exc:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY, "cannot settle with yourself"
+        ) from exc
+
+
+@router.get("/settlements/incoming", response_model=SettlementListResponse)
+async def list_incoming_settlements(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SettlementListResponse:
+    return await _svc(db).list_incoming_settlements(user)
+
+
+@router.get("/settlements/outgoing", response_model=SettlementListResponse)
+async def list_outgoing_settlements(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SettlementListResponse:
+    return await _svc(db).list_outgoing_settlements(user)
+
+
+@router.post("/settlements/{settlement_id}/accept", response_model=SettlementResponse)
+async def accept_settlement(
+    settlement_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SettlementResponse:
+    try:
+        return await _svc(db).accept_settlement(settlement_id=settlement_id, user=user)
+    except SettlementNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "settlement not found") from exc
+    except SettlementNotRecipient as exc:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "not your settlement request to accept"
+        ) from exc
+    except SettlementNotPending as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "settlement is no longer pending"
+        ) from exc
+
+
+@router.post("/settlements/{settlement_id}/reject", response_model=SettlementResponse)
+async def reject_settlement(
+    settlement_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SettlementResponse:
+    try:
+        return await _svc(db).reject_settlement(settlement_id=settlement_id, user=user)
+    except SettlementNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "settlement not found") from exc
+    except SettlementNotRecipient as exc:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "not your settlement request to reject"
+        ) from exc
+    except SettlementNotPending as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "settlement is no longer pending"
         ) from exc

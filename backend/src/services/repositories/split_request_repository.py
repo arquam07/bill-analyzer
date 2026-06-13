@@ -110,24 +110,80 @@ class SplitRequestRepository:
         await self._session.flush()
         return sr
 
+    def _settlement_relations(self) -> list[ExecutableOption]:
+        return [
+            selectinload(SplitSettlement.from_user),
+            selectinload(SplitSettlement.to_user),
+            selectinload(SplitSettlement.initiated_by),
+        ]
+
     async def create_settlement(
         self,
         *,
         from_user_id: uuid.UUID,
         to_user_id: uuid.UUID,
+        initiated_by_user_id: uuid.UUID,
         amount: Decimal,
         note: str | None,
+        status: str = STATUS_PENDING,
     ) -> SplitSettlement:
         s = SplitSettlement(
             from_user_id=from_user_id,
             to_user_id=to_user_id,
+            initiated_by_user_id=initiated_by_user_id,
             amount=amount,
             note=note,
+            status=status,
         )
         self._session.add(s)
         await self._session.flush()
-        await self._session.refresh(s, attribute_names=["from_user", "to_user"])
+        await self._session.refresh(
+            s, attribute_names=["from_user", "to_user", "initiated_by"]
+        )
         return s
+
+    async def get_settlement_by_id(self, settlement_id: uuid.UUID) -> SplitSettlement | None:
+        result = await self._session.execute(
+            select(SplitSettlement)
+            .options(*self._settlement_relations())
+            .where(SplitSettlement.id == settlement_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def set_settlement_status(
+        self, settlement: SplitSettlement, status: str
+    ) -> SplitSettlement:
+        settlement.status = status
+        settlement.responded_at = datetime.now(UTC)
+        await self._session.flush()
+        return settlement
+
+    async def list_incoming_settlements(self, user_id: uuid.UUID) -> list[SplitSettlement]:
+        """Settlement requests addressed to this user (initiated by counterparty)."""
+        result = await self._session.execute(
+            select(SplitSettlement)
+            .options(*self._settlement_relations())
+            .where(
+                SplitSettlement.status == STATUS_PENDING,
+                SplitSettlement.initiated_by_user_id != user_id,
+                or_(
+                    SplitSettlement.from_user_id == user_id,
+                    SplitSettlement.to_user_id == user_id,
+                ),
+            )
+            .order_by(SplitSettlement.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def list_outgoing_settlements(self, user_id: uuid.UUID) -> list[SplitSettlement]:
+        """Settlement requests this user initiated."""
+        result = await self._session.execute(
+            select(SplitSettlement)
+            .options(*self._settlement_relations())
+            .where(SplitSettlement.initiated_by_user_id == user_id)
+            .order_by(SplitSettlement.created_at.desc())
+        )
+        return list(result.scalars().all())
 
     async def get_balances_data(
         self, user_id: uuid.UUID
@@ -150,10 +206,11 @@ class SplitRequestRepository:
                 selectinload(SplitSettlement.to_user),
             )
             .where(
+                SplitSettlement.status == STATUS_ACCEPTED,
                 or_(
                     SplitSettlement.from_user_id == user_id,
                     SplitSettlement.to_user_id == user_id,
-                )
+                ),
             )
         )
         return list(splits_result.scalars().all()), list(settlements_result.scalars().all())
